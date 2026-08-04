@@ -157,12 +157,8 @@ public struct StarDisplayFrame<Content: View>: View {
             // Height is bounded as well as width: the source art is taller than the
             // 90pt header, so sizing by width alone let it run underneath the display
             // content and get clipped mid-logo.
-            PixelImage(
-                url: WeatherStarResources.url("logo-corner.png", in: .logos),
-                width: Layout.logoWidth,
-                height: Layout.logoHeight
-            )
-            .designPosition(x: Layout.logoX, y: Layout.logoY)
+            StarLogo(width: Layout.logoWidth, height: Layout.logoHeight)
+                .designPosition(x: Layout.logoX, y: Layout.logoY)
 
             if let bottom = title.bottom {
                 StarText(

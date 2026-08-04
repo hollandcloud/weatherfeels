@@ -55,7 +55,13 @@ public struct CRTSettings: Equatable, Sendable {
     /// harsh moiré rather than lines.
     public var linePeriod: Double = 2
     /// Convergence error at the edges, in points.
-    public var aberration: Double = 0.9
+    ///
+    /// Deliberately tiny. `StarText` already draws each glyph as a black outline plus a
+    /// drop shadow, so a fringe of even a point lands beside an existing dark edge and the
+    /// letters read as doubled rather than as slightly misconverged — at 0.9 the ticker
+    /// looked mangled. This is also multiplied by radius² in the shader, so the figure here
+    /// is the value at the very corners.
+    public var aberration: Double = 0.3
     public var bloom: Double = 0.22
     public var vignette: Double = 0.28
 

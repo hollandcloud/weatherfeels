@@ -271,7 +271,7 @@ public struct RootView: View {
         // Apple Music is queued by playlist rather than by track: its items have no file
         // URL for the app's own player to open, so MusicKit plays the playlist directly.
         if settings.musicSource == .appleMusic, let id = settings.appleMusicPlaylistID {
-            musicPlayer.loadAppleMusicPlaylist(id: id, shuffle: settings.musicShuffle)
+            musicPlayer.loadAppleMusicPlaylist(id: id)
         } else {
             musicPlayer.load(tracks: musicLibrary.tracks, shuffle: settings.musicShuffle)
         }

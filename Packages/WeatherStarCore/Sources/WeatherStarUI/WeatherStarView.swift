@@ -26,9 +26,10 @@ public struct WeatherStarView: View {
         settings.screenEffect == .tube && CRTEffect.isAvailable
     }
 
-    private var tubeSettings: CRTSettings? {
+    private func tubeSettings(metrics: StarMetrics) -> CRTSettings? {
         guard usesTube else { return nil }
         var tube = CRTSettings()
+
         // The scanline choice still governs how heavy the lines are; `.off` means a clean
         // tube with curvature and bloom but no mask.
         switch settings.scanlines {
@@ -37,6 +38,15 @@ public struct WeatherStarView: View {
         case .thin: tube.scanlineDepth = 0.18
         case .medium: tube.scanlineDepth = 0.24
         case .thick: tube.scanlineDepth = 0.32
+        }
+
+        // Spacing comes from the design space and is scaled with everything else, exactly
+        // as the `Canvas` overlay does it. A fixed period looks like scanlines at 1080p and
+        // like a shredder at 4K, because the glyphs grow with the scale and the lines do
+        // not.
+        let thickness = Scanlines.designThickness(for: settings.scanlines)
+        if thickness > 0 {
+            tube.linePeriod = metrics.s(thickness) * 2
         }
         return tube
     }
@@ -82,7 +92,7 @@ public struct WeatherStarView: View {
                 // guess at alpha it cannot reconstruct; giving it a solid picture removes
                 // the question. The outer black is still there for the letterbox.
                 .background(Color.black)
-                .crtEffect(tubeSettings, size: proxy.size)
+                .crtEffect(tubeSettings(metrics: metrics), size: proxy.size)
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
             .onAppear { metricsWidth = space.width }
@@ -130,16 +140,21 @@ public struct WeatherStarView: View {
     private var startupScreen: some View {
         StarDisplayFrame(
             display: .currentWeather,
-            titleOverride: ("WeatherStar", "4000+"),
+            titleOverride: (StarBranding.startupTitle, StarBranding.startupSubtitle),
             clockInterval: settings.clockSeconds ? 1 : 15,
             clockFormat: { (store.clockText($0), store.dateText($0)) }
         ) {
             VStack(spacing: 0) {
+                // The progress list absorbs the slack and is clipped if it runs long,
+                // instead of a `Spacer` letting it push the block below off the panel.
+                // With enough displays enabled it did exactly that, and the credit, the
+                // link and the progress bar all fell off the bottom of the screen.
                 ProgressDisplay(
                     displays: DisplayIdentifier.rotationOrder.filter { settings.isEnabled($0) },
                     statusFor: { engine.state(for: $0).status }
                 )
-                Spacer(minLength: 0)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .clipped()
 
                 // Credit the project this is ported from, on the screen every launch
                 // passes through.

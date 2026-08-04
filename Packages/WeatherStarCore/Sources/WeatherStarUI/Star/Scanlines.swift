@@ -27,7 +27,12 @@ public struct Scanlines: View {
     }
 
     /// Design-space thickness of one dark line. The pattern period is twice this.
-    private var lineThickness: CGFloat {
+    ///
+    /// Exposed so the CRT shader can use the same spacing. Its first version hard-coded a
+    /// 2-point period, which at 4K is nearly seven times finer than this — fine enough to
+    /// cut chunks out of every glyph in the ticker, so the text read as broken rather than
+    /// scanlined.
+    static func designThickness(for mode: ScanlineMode) -> CGFloat {
         switch mode {
         case .off: 0
         case .hairline: 0.5
@@ -36,6 +41,8 @@ public struct Scanlines: View {
         case .thick: 2
         }
     }
+
+    private var lineThickness: CGFloat { Self.designThickness(for: mode) }
 
     private var opacity: Double {
         switch mode {

@@ -376,7 +376,7 @@ struct MusicPlayerTests {
         #expect(player.queue.count == 2)
         #expect(spy.stopCount == 0, "the Apple Music player was touched for a file source")
 
-        player.loadAppleMusicPlaylist(id: "p.abc123", shuffle: true)
+        player.loadAppleMusicPlaylist(id: "p.abc123")
         #expect(player.appleMusicPlaylistID == "p.abc123")
         // The file queue is emptied: MusicKit owns the ordering for this source, so a
         // stale queue here would make `currentTrack` disagree with what is audible.
@@ -402,7 +402,7 @@ struct MusicPlayerTests {
         let spy = AppleMusicSpy()
         let player = MusicPlayer(appleMusic: spy)
 
-        player.loadAppleMusicPlaylist(id: "p.race", shuffle: true)
+        player.loadAppleMusicPlaylist(id: "p.race")
         player.play()
         player.play()
 
@@ -413,7 +413,10 @@ struct MusicPlayerTests {
             "asked the Apple Music player to start \(spy.played.count) times, not once"
         )
         #expect(spy.played.first?.playlist == "p.race")
-        #expect(spy.played.first?.shuffle == true)
+        #expect(
+            spy.played.first?.shuffle == true,
+            "Apple Music must always shuffle, whatever the file-source Shuffle setting is"
+        )
 
         // The guard must clear, or nothing can ever be started again.
         player.play()

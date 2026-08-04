@@ -120,19 +120,18 @@ public final class MusicPlayer {
     }
 
     /// Switch to an Apple Music playlist, replacing whatever was queued.
-    public func loadAppleMusicPlaylist(id: String, shuffle: Bool) {
+    ///
+    /// Always shuffled, regardless of the `Shuffle` preference, which governs the file
+    /// sources. A playlist chosen once and then played behind the weather forever would
+    /// otherwise open with the same track on every single launch.
+    public func loadAppleMusicPlaylist(id: String) {
         let wasPlaying = isPlaying
         stopFilePlayback()
         queue = []
         currentIndex = 0
         appleMusicPlaylistID = id
-        shuffleAppleMusic = shuffle
         if wasPlaying { play() }
     }
-
-    /// Whether the Apple Music queue should be shuffled, remembered across transport
-    /// calls because MusicKit needs it set on the player rather than on the queue.
-    private var shuffleAppleMusic = true
 
     /// Guards against two overlapping MusicKit queue assignments. See `play()`.
     @ObservationIgnored private var isStartingAppleMusic = false
@@ -162,11 +161,10 @@ public final class MusicPlayer {
 
             configureAudioSession()
             isPlaying = true
-            let shuffle = shuffleAppleMusic
             Task { [weak self] in
                 defer { self?.isStartingAppleMusic = false }
                 do {
-                    try await appleMusic.play(playlistID: playlistID, shuffle: shuffle)
+                    try await appleMusic.play(playlistID: playlistID, shuffle: true)
                 } catch {
                     guard let self else { return }
                     self.logger.error(

@@ -56,10 +56,7 @@ struct ExtendedForecastDisplay: View {
     }
 
     private func panel(_ day: ExtendedDay) -> some View {
-        // Center the 155pt text column inside the 174pt panel.
-        let textInset = (Layout.panelWidth - Layout.textWidth) / 2
-
-        return ZStack(alignment: .top) {
+        ZStack(alignment: .top) {
             StarText(
                 day.dayName,
                 font: .regular,
@@ -80,8 +77,12 @@ struct ExtendedForecastDisplay: View {
                 lineLimit: 3,
                 minimumScaleFactor: 0.55
             )
+            // No x offset. This frame is narrower than the panel and the enclosing ZStack
+            // already centres it; adding half the difference as an inset applied the
+            // centring twice, pushing the text against the panel's right edge and
+            // truncating the last line.
             .designFrame(width: Layout.textWidth, height: Layout.conditionHeight, alignment: .top)
-            .designOffset(x: textInset, y: Layout.conditionY)
+            .designOffset(y: Layout.conditionY)
 
             PixelImage(day.icon, height: Layout.iconHeight)
                 .designFrame(width: Layout.panelWidth, alignment: .center)

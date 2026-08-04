@@ -187,6 +187,12 @@ public struct SettingsView: View {
         Section {
             Toggle("Play music", isOn: bind(\.musicEnabled))
             Toggle("Shuffle", isOn: bind(\.musicShuffle))
+                .disabled(settings.musicSource.usesAppleMusicPlayer)
+            if settings.musicSource.usesAppleMusicPlayer {
+                Text("Apple Music playlists always shuffle.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
 
             // Volume: tvOS has no Slider, so use discrete steps there.
             #if os(tvOS)

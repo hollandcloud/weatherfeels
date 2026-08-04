@@ -49,6 +49,21 @@ settings:
     DEVELOPMENT_TEAM: $(WS4K_TEAM_ID)
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     SWIFT_EMIT_LOC_STRINGS: YES
+    # ---- Branding -----------------------------------------------------------
+    # Build-time, not a user setting: whoever ships a copy decides what mark it
+    # carries. Read by `StarBranding`; everything falls back to the bundled
+    # WeatherStar 4000+ artwork when unset, so leaving these alone changes nothing.
+    #
+    #   WS4KLogoImageName   an image in the app's own Assets.xcassets, replacing the
+    #                       corner logo. Add it to Apps/<platform>/Assets.xcassets.
+    #   WS4KStartupTitle    startup screen, first line  (default "WeatherStar")
+    #   WS4KStartupSubtitle startup screen, second line (default "4000+";
+    #                       set to an empty string for a single-line title)
+    #
+    # INFOPLIST_KEY_ prefixed settings are copied into Info.plist by Xcode.
+    # INFOPLIST_KEY_WS4KLogoImageName: MyCornerLogo
+    # INFOPLIST_KEY_WS4KStartupTitle: My Weather
+    # INFOPLIST_KEY_WS4KStartupSubtitle: Channel
     # Uncomment to enable private iCloud music sync. Also requires an iCloud
     # container in the target entitlements — see README.md.
     # SWIFT_ACTIVE_COMPILATION_CONDITIONS: WS4K_CLOUDKIT
