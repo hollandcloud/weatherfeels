@@ -40,13 +40,16 @@ public struct WeatherStarView: View {
         case .thick: tube.scanlineDepth = 0.32
         }
 
-        // Spacing comes from the design space and is scaled with everything else, exactly
-        // as the `Canvas` overlay does it. A fixed period looks like scanlines at 1080p and
-        // like a shredder at 4K, because the glyphs grow with the scale and the lines do
-        // not.
-        let thickness = Scanlines.designThickness(for: settings.scanlines)
-        if thickness > 0 {
-            tube.linePeriod = metrics.s(thickness) * 2
+        // One line per row of the original 480-line raster, which is what a tube actually
+        // did and keeps the pitch proportional to the picture at any resolution.
+        //
+        // Two earlier attempts were both wrong in opposite directions. A fixed 2-point
+        // period is too fine once the canvas is scaled up; borrowing the `Canvas` overlay's
+        // design-space thickness is far too coarse — that path deliberately draws chunky
+        // lines, and at 4K one dark band came out wider than the ticker's small label is
+        // tall, so it looked like the text had its top sliced off.
+        if Scanlines.designThickness(for: settings.scanlines) > 0 {
+            tube.linePeriod = max(1.5, metrics.scaledSize.height / 480)
         }
         return tube
     }
