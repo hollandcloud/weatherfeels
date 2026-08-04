@@ -118,7 +118,7 @@ public struct SettingsView: View {
             }
 
             Picker("Screen effect", selection: bind(\.screenEffect)) {
-                ForEach(ScreenEffect.allCases, id: \.self) { effect in
+                ForEach(ScreenEffect.availableCases, id: \.self) { effect in
                     Text(effect.displayName).tag(effect)
                 }
             }

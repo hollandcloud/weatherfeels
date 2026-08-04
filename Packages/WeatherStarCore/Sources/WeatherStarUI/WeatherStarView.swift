@@ -28,7 +28,7 @@ public struct WeatherStarView: View {
 
     /// Drifting lines on the GPU: asked for, and the shader is there.
     private var usesShaderLines: Bool {
-        settings.screenEffect == .animated && CRTEffect.isAvailable
+        settings.screenEffect == .animated && CRTEffect.isAvailable && ScreenEffect.tube.isAvailableOnThisPlatform
     }
 
     /// Whether the drawn `Canvas` overlay is doing the work.

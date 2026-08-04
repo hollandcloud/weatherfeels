@@ -344,8 +344,11 @@ public struct ScrollTicker: View {
             )
             .designPosition(x: Self.sideMargin, y: 6)
 
-            // 30fps rather than display-rate: at 60pt/s of travel the difference is
-            // imperceptible.
+            // 20fps, not display-rate. A profile of the idle app showed the remaining
+            // cost is not drawing at all — no CoreText frames appear — but SwiftUI
+            // re-evaluating the view graph on every tick, plus CoreAnimation display-link
+            // dispatch. Frames are therefore the lever, and at 60pt/s of travel 20 is
+            // still smooth.
             //
             // Only the *offset* changes per frame. The line itself is rasterised once and
             // then translated, because `StarText` is six Core Text passes per label — an
@@ -357,7 +360,7 @@ public struct ScrollTicker: View {
             // `.id(current.text)` is what makes the caching work: the view keeps its
             // identity while the line is unchanged, so the rasterisation is reused, and a
             // new one is built only when the ticker moves to the next line.
-            TimelineView(.periodic(from: .now, by: 1.0 / 30.0)) { timeline in
+            TimelineView(.periodic(from: .now, by: 1.0 / 20.0)) { timeline in
                 let current = state(at: timeline.date)
 
                 cachedLine(current.text)

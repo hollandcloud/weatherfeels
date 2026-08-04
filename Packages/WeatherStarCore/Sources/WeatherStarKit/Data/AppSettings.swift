@@ -76,6 +76,26 @@ public enum ScreenEffect: String, Codable, Sendable, CaseIterable {
             "Curved glass, phosphor bloom and colour fringing, drawn on the GPU."
         }
     }
+
+    /// Whether this build can offer the mode at all.
+    ///
+    /// The tube is withheld on tvOS. Both SwiftUI-shader modes render a black screen on a
+    /// real Apple TV while working in the simulator — which runs on the Mac's Metal stack —
+    /// and `starScanlines` is a trivial `colorEffect` with no texture reads and no
+    /// coordinate maths that could fail, so its failing identically to the complex
+    /// `layerEffect` points at the shader modifiers themselves rather than at anything in
+    /// them. Offering a mode that blanks the screen is worse than not offering it.
+    public var isAvailableOnThisPlatform: Bool {
+        #if os(tvOS)
+        self != .tube
+        #else
+        true
+        #endif
+    }
+
+    public static var availableCases: [ScreenEffect] {
+        allCases.filter(\.isAvailableOnThisPlatform)
+    }
 }
 
 /// Playback speed multiplier applied to every display's dwell time.
@@ -123,7 +143,8 @@ public final class AppSettings {
         speed = defaults.decoded(Key.speed, default: .normal)
         storedRefreshMinutes = min(max(defaults.value(forKey: Key.refreshMinutes) as? Int ?? 10, 5), 60)
         clockSeconds = defaults.bool(forKey: Key.clockSeconds, default: true)
-        screenEffect = defaults.decoded(Key.screenEffect, default: .plain)
+        let storedEffect = defaults.decoded(Key.screenEffect, default: ScreenEffect.plain)
+        screenEffect = storedEffect.isAvailableOnThisPlatform ? storedEffect : .plain
         // Defaults on only for Apple TV. A television is the panel at risk of burn-in and
         // the device most likely to be left showing this for hours; nudging a phone or a
         // Mac window around would be noise for no benefit.
