@@ -290,6 +290,22 @@ public struct ScrollTicker: View {
         }
     }
 
+    /// One line of ticker text, rasterised into a single layer so scrolling it is a
+    /// transform rather than six text passes per frame.
+    private func cachedLine(_ text: String) -> some View {
+        StarText(
+            text,
+            font: .regular,
+            size: Self.textSize,
+            color: StarColor.body,
+            lineLimit: 1
+        )
+        // Laid out at full width so it is never condensed, then translated.
+        .fixedSize()
+        .drawingGroup()
+        .id(text)
+    }
+
     /// Which line is showing and how far it has scrolled, for a point in time.
     private func state(at date: Date) -> (text: String, offset: CGFloat) {
         guard !segments.isEmpty else { return ("", 0) }
@@ -329,23 +345,26 @@ public struct ScrollTicker: View {
             .designPosition(x: Self.sideMargin, y: 6)
 
             // 30fps rather than display-rate: at 60pt/s of travel the difference is
-            // imperceptible and it halves the number of text render passes.
+            // imperceptible.
+            //
+            // Only the *offset* changes per frame. The line itself is rasterised once and
+            // then translated, because `StarText` is six Core Text passes per label — an
+            // outline, a shadow and the fill — and re-running them thirty times a second on
+            // a full-width line of scaled-up type was the single most expensive thing the
+            // app did. On a Mac it showed as ~9% CPU for a still picture; on an Apple TV at
+            // 4K it was the difference between smooth and about four frames a second.
+            //
+            // `.id(current.text)` is what makes the caching work: the view keeps its
+            // identity while the line is unchanged, so the rasterisation is reused, and a
+            // new one is built only when the ticker moves to the next line.
             TimelineView(.periodic(from: .now, by: 1.0 / 30.0)) { timeline in
                 let current = state(at: timeline.date)
 
-                StarText(
-                    current.text,
-                    font: .regular,
-                    size: Self.textSize,
-                    color: StarColor.body,
-                    lineLimit: 1
-                )
-                // Laid out at full width so it is never condensed, then translated.
-                .fixedSize()
-                .designOffset(x: current.offset)
-                .designFrame(width: viewportWidth, alignment: .leading)
-                .clipped()
-                .designPosition(x: Self.sideMargin, y: 34)
+                cachedLine(current.text)
+                    .designOffset(x: current.offset)
+                    .designFrame(width: viewportWidth, alignment: .leading)
+                    .clipped()
+                    .designPosition(x: Self.sideMargin, y: 34)
             }
         }
         .designFrame(width: metrics.space.width, height: Self.height)
