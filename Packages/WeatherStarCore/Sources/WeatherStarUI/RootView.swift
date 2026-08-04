@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 import WeatherStarKit
 
 /// Top-level view: runs onboarding on first launch, then the display rotation.
@@ -296,6 +299,7 @@ public struct RootView: View {
         switch phase {
         case .active:
             engine.isPlaying = true
+            setIdleTimerDisabled(true)
             if wasPlayingBeforeBackground, settings.musicEnabled {
                 musicPlayer.play()
             }
@@ -305,9 +309,25 @@ public struct RootView: View {
             musicPlayer.pause()
             // Also stop advancing displays; nothing is visible and it wastes power.
             engine.isPlaying = false
+            setIdleTimerDisabled(false)
         @unknown default:
             break
         }
+    }
+
+    /// Keep the screen saver away while the displays are on show.
+    ///
+    /// Apple TV has no idea this app is doing anything: the rotation redraws without any
+    /// user input, so tvOS counts the whole session as idle and the screen saver takes
+    /// over mid-forecast. The same applies to a phone or iPad propped up as a weather
+    /// display.
+    ///
+    /// Released whenever the app is not active, so nothing keeps a device awake in the
+    /// background.
+    private func setIdleTimerDisabled(_ disabled: Bool) {
+        #if canImport(UIKit) && !os(watchOS)
+        UIApplication.shared.isIdleTimerDisabled = disabled
+        #endif
     }
 
     // MARK: - Controls visibility

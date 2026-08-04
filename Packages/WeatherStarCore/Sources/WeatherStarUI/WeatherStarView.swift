@@ -11,6 +11,13 @@ public struct WeatherStarView: View {
     /// Width of the resolved design space, for the credit line on the startup screen.
     @State private var metricsWidth: CGFloat = 640
 
+    /// Current burn-in offset.
+    ///
+    /// Held in state and updated by a slow loop rather than read from a `TimelineView`:
+    /// the offset only changes every 90 seconds, and a timeline would rebuild the whole
+    /// canvas on every frame to deliver a value that is almost always identical.
+    @State private var burnInOffset: CGPoint = .zero
+
     public init() {}
 
     public var body: some View {
@@ -27,12 +34,21 @@ public struct WeatherStarView: View {
             ZStack {
                 Color.black
 
-                canvas(metrics: metrics)
-                    .environment(\.starMetrics, metrics)
+                // The canvas and its scanlines shift together. Offsetting only the canvas
+                // would slide the content out from under a fixed line pattern, which reads
+                // as the picture tearing rather than as a still image.
+                ZStack {
+                    canvas(metrics: metrics)
+                        .environment(\.starMetrics, metrics)
 
-                Scanlines(mode: settings.scanlines)
+                    Scanlines(
+                        mode: settings.scanlines,
+                        animated: settings.animatedScanlines
+                    )
                     .environment(\.starMetrics, metrics)
                     .frame(width: metrics.scaledSize.width, height: metrics.scaledSize.height)
+                }
+                .offset(x: burnInOffset.x, y: burnInOffset.y)
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
             .onAppear { metricsWidth = space.width }
@@ -40,6 +56,26 @@ public struct WeatherStarView: View {
         }
         .ignoresSafeArea()
         .background(Color.black)
+        .task(id: settings.burnInProtection) { await driveBurnInShift() }
+    }
+
+    /// Step the burn-in offset on a wall-clock schedule.
+    ///
+    /// Aligned to the clock rather than to launch, so the position does not depend on when
+    /// the app happened to start and the first move is not an immediate jump.
+    private func driveBurnInShift() async {
+        guard settings.burnInProtection else {
+            burnInOffset = .zero
+            return
+        }
+        while !Task.isCancelled {
+            let now = Date().timeIntervalSinceReferenceDate
+            burnInOffset = BurnInShift.offset(at: now)
+
+            let untilNextStep = BurnInShift.stepInterval
+                - now.truncatingRemainder(dividingBy: BurnInShift.stepInterval)
+            try? await Task.sleep(for: .seconds(max(1, untilNextStep)))
+        }
     }
 
     /// The scaled canvas: either the startup screen or the active display.

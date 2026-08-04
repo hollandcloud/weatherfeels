@@ -117,6 +117,24 @@ public struct SettingsView: View {
                 }
             }
 
+            // Only meaningful with lines to animate.
+            if settings.scanlines != .off {
+                Toggle("Animate scanlines", isOn: bind(\.animatedScanlines))
+                Text("Adds the slow drift and roll bar of a taped broadcast.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Toggle("Shift image to protect the screen", isOn: bind(\.burnInProtection))
+            Text(
+                """
+                Moves the picture a few pixels every \(Int(BurnInShift.stepInterval)) \
+                seconds so a static header or clock cannot burn into an OLED panel.
+                """
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+
             Picker("Speed", selection: bind(\.speed)) {
                 ForEach(PlaybackSpeed.allCases, id: \.self) { speed in
                     Text(speed.displayName).tag(speed)

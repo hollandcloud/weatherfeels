@@ -22,8 +22,23 @@ public actor RadarService {
     private static let fullSize = CGSize(width: 2550, height: 1600)
     /// Crop taken around the location, in full-size pixels.
     private static let sourceSize = CGSize(width: 240, height: 163)
-    /// Where the location sits inside that crop.
-    private static let sourceOffset = CGPoint(x: 240, y: 138)
+
+    /// Where the location sits inside that crop — the middle.
+    ///
+    /// Upstream uses a literal `{x: 240, y: 138}` here (`RADAR_OFFSET` in
+    /// `radar-constants.mjs`; its `* 2` in `getXYFromLatitudeLongitudeDoppler` is undone
+    /// by the `/ 2` in `radar-processor.mjs`, so it is applied at this scale). Against a
+    /// 240×163 crop that puts the location at 100% across and 85% down — the very
+    /// bottom-right corner — so the window actually shows the area north-west of you.
+    /// Upstream centres its *base map* (`- TILE_SIZE.y / 2` in
+    /// `getXYFromLatitudeLongitudeMap`) but never the radar window.
+    ///
+    /// Half the crop puts the location in the middle, which is what "Local Radar" should
+    /// mean. This is a deliberate divergence from upstream.
+    private static let sourceOffset = CGPoint(
+        x: sourceSize.width / 2,
+        y: sourceSize.height / 2
+    )
     /// Size the crop is stretched to for display.
     private static let finalSize = CGSize(width: 640, height: 367)
 

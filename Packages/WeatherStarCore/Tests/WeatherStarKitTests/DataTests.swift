@@ -482,3 +482,70 @@ struct SPCGeometryTests {
         #expect(!SPCOutlookService.contains(latitude: 0, longitude: 0, rings: []))
     }
 }
+
+/// The radar window must be centred on the viewer's location.
+///
+/// Upstream's `RADAR_OFFSET` of `{x: 240, y: 138}` against a 240×163 crop put the
+/// location in the bottom-right *corner*, so "Local Radar" displayed the area to the
+/// north-west. These assert the geographic window actually surrounds the point.
+@Suite("Radar framing")
+struct RadarFramingTests {
+    /// `canCentre` is false where the composite runs out before the crop can be centred,
+    /// so the window is legitimately clamped and the location sits off to one side.
+    ///
+    /// The projection spans longitude −129.138 to about −68.68 (`2550 / 42.1768` degrees
+    /// east of the anchor), so eastern Maine is right at the edge — Bangor is at −68.77,
+    /// barely inside. That is inherited from upstream's constants, not a framing fault,
+    /// and no offset can fix it.
+    private static let places: [
+        (name: String, latitude: Double, longitude: Double, canCentre: Bool)
+    ] = [
+        ("Tampa FL", 27.9506, -82.4572, true),
+        ("Orlando FL", 28.5383, -81.3792, true),
+        ("Seattle WA", 47.6062, -122.3321, true),
+        ("Chicago IL", 41.8781, -87.6298, true),
+        ("Denver CO", 39.7392, -104.9903, true),
+        ("Bangor ME", 44.8016, -68.7712, false),
+    ]
+
+    @Test("The location falls inside its own radar window")
+    func locationInsideBounds() {
+        for place in Self.places {
+            let bounds = RadarService.bounds(
+                latitude: place.latitude, longitude: place.longitude
+            )
+            #expect(
+                bounds.minLatitude < place.latitude && place.latitude < bounds.maxLatitude,
+                "\(place.name): latitude \(place.latitude) outside \(bounds.minLatitude)...\(bounds.maxLatitude)"
+            )
+            #expect(
+                bounds.minLongitude < place.longitude && place.longitude < bounds.maxLongitude,
+                "\(place.name): longitude \(place.longitude) outside \(bounds.minLongitude)...\(bounds.maxLongitude)"
+            )
+        }
+    }
+
+    @Test("The location sits near the middle of the window")
+    func locationNearCentre() {
+        for place in Self.places where place.canCentre {
+            let bounds = RadarService.bounds(
+                latitude: place.latitude, longitude: place.longitude
+            )
+            let acrossFraction =
+                (place.longitude - bounds.minLongitude) / (bounds.maxLongitude - bounds.minLongitude)
+            let downFraction =
+                (bounds.maxLatitude - place.latitude) / (bounds.maxLatitude - bounds.minLatitude)
+
+            // Generously wide, but the old behaviour was 1.00 across and 0.85 down, so
+            // this still rejects it decisively.
+            #expect(
+                (0.25...0.75).contains(acrossFraction),
+                "\(place.name): \(Int(acrossFraction * 100))% across the radar window"
+            )
+            #expect(
+                (0.25...0.75).contains(downFraction),
+                "\(place.name): \(Int(downFraction * 100))% down the radar window"
+            )
+        }
+    }
+}

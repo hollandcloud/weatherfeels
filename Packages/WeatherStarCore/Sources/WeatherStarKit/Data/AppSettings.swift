@@ -91,6 +91,15 @@ public final class AppSettings {
         speed = defaults.decoded(Key.speed, default: .normal)
         storedRefreshMinutes = min(max(defaults.value(forKey: Key.refreshMinutes) as? Int ?? 10, 5), 60)
         clockSeconds = defaults.bool(forKey: Key.clockSeconds, default: true)
+        animatedScanlines = defaults.bool(forKey: Key.animatedScanlines, default: false)
+        // Defaults on only for Apple TV. A television is the panel at risk of burn-in and
+        // the device most likely to be left showing this for hours; nudging a phone or a
+        // Mac window around would be noise for no benefit.
+        #if os(tvOS)
+        burnInProtection = defaults.bool(forKey: Key.burnInProtection, default: true)
+        #else
+        burnInProtection = defaults.bool(forKey: Key.burnInProtection, default: false)
+        #endif
         enabledDisplayIDs = Set(
             defaults.stringArray(forKey: Key.enabledDisplays)
                 ?? DisplayIdentifier.defaultEnabled.map(\.rawValue)
@@ -126,6 +135,20 @@ public final class AppSettings {
     public var scanlines: ScanlineMode { didSet { defaults.encode(scanlines, Key.scanlines) } }
     public var speed: PlaybackSpeed { didSet { defaults.encode(speed, Key.speed) } }
     public var clockSeconds: Bool { didSet { defaults.set(clockSeconds, forKey: Key.clockSeconds) } }
+
+    /// Give the scanlines the slow drift and roll bar of a taped broadcast.
+    ///
+    /// Costs a redraw of one full-screen overlay at 24fps, so it is a choice rather than
+    /// the default.
+    public var animatedScanlines: Bool {
+        didSet { defaults.set(animatedScanlines, forKey: Key.animatedScanlines) }
+    }
+
+    /// Walk the canvas a few points around its centre to avoid burning in the header,
+    /// logo and clock. See `BurnInShift`.
+    public var burnInProtection: Bool {
+        didSet { defaults.set(burnInProtection, forKey: Key.burnInProtection) }
+    }
 
     // Clamped properties use a private store plus a computed accessor rather than
     // assigning to themselves inside `didSet`. Under `@Observable` a self-assignment
@@ -263,6 +286,8 @@ private enum Key {
     static let speed = prefix + "speed"
     static let refreshMinutes = prefix + "refreshMinutes"
     static let clockSeconds = prefix + "clockSeconds"
+    static let animatedScanlines = prefix + "animatedScanlines"
+    static let burnInProtection = prefix + "burnInProtection"
     static let enabledDisplays = prefix + "enabledDisplays"
     static let hasCompletedOnboarding = prefix + "hasCompletedOnboarding"
     static let locationMode = prefix + "locationMode"

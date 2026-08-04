@@ -56,6 +56,46 @@ from the rotation rather than blanking the screen.
 Hourly, Travel, Hourly Graph and SPC Outlook are off by default, as upstream has
 them. Toggle any of them in Settings.
 
+### Radar is centred on you, unlike upstream
+
+Upstream's `RADAR_OFFSET` is a literal `{x: 240, y: 138}` against a 240×163 crop, which
+places your location at 100% across and 85% down — the bottom-right corner — so the
+window actually shows the area to your north-west. (Its `* 2` in
+`getXYFromLatitudeLongitudeDoppler` is undone by the `/ 2` in `radar-processor.mjs`, so
+the offset really is applied at that scale.) Upstream centres its *base map* via
+`- TILE_SIZE.y / 2` but never the radar window.
+
+Here the offset is half the crop, so "Local Radar" means what it says. `RadarFramingTests`
+asserts a spread of locations land near the middle of their own window — with eastern
+Maine flagged as a legitimate exception, since the projection only reaches longitude
+−68.68 and the crop has to clamp inside the composite.
+
+## Screen care on a television
+
+Two options under **Settings → Display**, both aimed at an Apple TV left running for
+hours:
+
+**Shift image to protect the screen** — on by default on tvOS only. The header plate, logo
+and clock never move, which is the worst case for an OLED panel. `BurnInShift` walks the
+whole canvas around a nine-position ring, three points from centre, one step every 90
+seconds. Offsets are whole points, never fractional: a sub-point translation would
+resample the pixel-art glyphs and undo the nearest-neighbour scaling everything else
+preserves. The ring sums to zero in both axes, so no pixel accumulates more exposure than
+another. Driven by a 90-second loop rather than a `TimelineView`, so it invalidates the
+canvas only when it actually moves.
+
+**Animate scanlines** — off by default. Adds the slow drift and creeping roll bar of a
+CRT filmed off-screen. Drawn in `Canvas` at 24fps rather than with a Metal shader: SwiftPM
+does not compile `.metal` files in a package target (it reports them as unhandled
+resources), so a shader would have to be added to each of the three app targets and
+reached through `ShaderLibrary.default` — which also puts it beyond the snapshot tests,
+where a missing shader function traps at render time.
+
+The app also holds `isIdleTimerDisabled` while it is active, because the rotation redraws
+with no user input and tvOS otherwise counts the whole session as idle and drops the
+screen saver over the forecast. It is released whenever the app is not active, so nothing
+keeps a device awake in the background.
+
 ## Location
 
 Defaults to **the device's own location** via CoreLocation, which works on all
