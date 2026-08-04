@@ -84,12 +84,38 @@ preserves. The ring sums to zero in both axes, so no pixel accumulates more expo
 another. Driven by a 90-second loop rather than a `TimelineView`, so it invalidates the
 canvas only when it actually moves.
 
-**Animate scanlines** — off by default. Adds the slow drift and creeping roll bar of a
-CRT filmed off-screen. Drawn in `Canvas` at 24fps rather than with a Metal shader: SwiftPM
-does not compile `.metal` files in a package target (it reports them as unhandled
-resources), so a shader would have to be added to each of the three app targets and
-reached through `ShaderLibrary.default` — which also puts it beyond the snapshot tests,
-where a missing shader function traps at render time.
+**Screen effect** — `Static` (default), `Animated`, or `CRT tube`.
+
+*Animated* drifts the scanlines and creeps a soft roll bar down the screen, drawn in
+`Canvas` at 24fps so it works everywhere.
+
+*CRT tube* is [`Shaders/StarCRT.metal`](Shaders/StarCRT.metal): barrel curvature, phosphor
+bloom, convergence fringing that grows towards the edges, the scanline mask and corner
+falloff, in one `layerEffect` pass at 30fps. The order matters and mirrors the physics —
+geometry first, because the glass bends the picture; then the beam; then the mask, which
+belongs to the *face* of the tube and so is keyed off the destination pixel rather than the
+warped source, or the lines would bend along with the image.
+
+The `Scanlines` setting still sets how heavy the mask is, and `Off` gives a clean tube with
+curvature and bloom but no lines.
+
+Two things that shape how this is wired:
+
+**The shader cannot live in the package.** SwiftPM does not compile `.metal` in a package
+target — it reports the file as an unhandled resource and produces no metallib. So it sits
+in `Shaders/` and is added to the sources of all three app targets, which makes Xcode build
+it into each app's `default.metallib` for `ShaderLibrary.default` to find. The consequence
+is that the function is absent anywhere there is no app bundle, including the package's own
+snapshot tests, and a SwiftUI shader naming a missing function is a hard failure at render
+time rather than a no-op. `CRTEffect.isAvailable` checks for the metallib first, and
+`tubeFallsBackWhenShaderMissing` asserts that path renders instead of taking the suite down.
+
+**Xcode 26 ships the Metal compiler separately.** Without it the build fails with
+`cannot execute tool 'metal' due to missing Metal Toolchain`:
+
+```bash
+xcodebuild -downloadComponent MetalToolchain     # ~690 MB, one time
+```
 
 The app also holds `isIdleTimerDisabled` while it is active, because the rotation redraws
 with no user input and tvOS otherwise counts the whole session as idle and drops the
@@ -240,8 +266,15 @@ so a client cannot write outside it.
 
 ## Building
 
-Requires **Xcode 26** or newer and [XcodeGen](https://github.com/yonaskolb/XcodeGen)
-(`brew install xcodegen`).
+Requires **Xcode 26** or newer, [XcodeGen](https://github.com/yonaskolb/XcodeGen)
+(`brew install xcodegen`), and the Metal toolchain, which Xcode 26 no longer bundles:
+
+```bash
+xcodebuild -downloadComponent MetalToolchain     # ~690 MB, one time
+```
+
+Without it the app targets fail to build with `cannot execute tool 'metal' due to missing
+Metal Toolchain`, because the CRT shader is compiled into each app bundle.
 
 ```bash
 xcodegen generate        # writes WeatherStar.xcodeproj from project.yml

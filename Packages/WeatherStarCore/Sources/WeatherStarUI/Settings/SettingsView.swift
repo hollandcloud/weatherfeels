@@ -117,12 +117,21 @@ public struct SettingsView: View {
                 }
             }
 
-            // Only meaningful with lines to animate.
-            if settings.scanlines != .off {
-                Toggle("Animate scanlines", isOn: bind(\.animatedScanlines))
-                Text("Adds the slow drift and roll bar of a taped broadcast.")
+            Picker("Screen effect", selection: bind(\.screenEffect)) {
+                ForEach(ScreenEffect.allCases, id: \.self) { effect in
+                    Text(effect.displayName).tag(effect)
+                }
+            }
+            Text(settings.screenEffect.detail)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            // Stated rather than hidden: choosing the tube and getting the animated
+            // overlay would otherwise look like the setting doing nothing.
+            if settings.screenEffect == .tube, !CRTEffect.isAvailable {
+                Text("The CRT shader is not in this build; showing animated scanlines instead.")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.orange)
             }
 
             Toggle("Shift image to protect the screen", isOn: bind(\.burnInProtection))

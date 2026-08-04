@@ -70,5 +70,32 @@ struct ScanlineTests {
         #expect((rows.max() ?? 0) > 200)
         #expect((rows.min() ?? 255) < 200)
     }
+
+    /// The guard has to hold, or every snapshot test dies.
+    ///
+    /// `ShaderLibrary.default` reads the main bundle's metallib, which exists in an app and
+    /// not in this test process. A SwiftUI shader naming a function that is not there is a
+    /// hard failure at render time, so `CRTEffect.isAvailable` is what keeps asking for the
+    /// tube from taking the whole suite down.
+    @Test("Requesting the tube without a metallib renders instead of trapping")
+    func tubeFallsBackWhenShaderMissing() throws {
+        #expect(
+            !CRTEffect.isAvailable,
+            "this process has a metallib, so the fallback path is not being exercised"
+        )
+
+        let view = ZStack {
+            Color.white
+            Color.blue.frame(width: 100, height: 100)
+        }
+        .frame(width: Self.size.width, height: Self.size.height)
+        .crtEffect(CRTSettings(), size: Self.size)
+
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 1
+        // Reaching this line at all is the assertion: a missing shader would have
+        // terminated the process.
+        #expect(renderer.cgImage != nil, "the fallback path failed to render")
+    }
 }
 #endif

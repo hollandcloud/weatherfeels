@@ -18,6 +18,29 @@ public struct WeatherStarView: View {
     /// canvas on every frame to deliver a value that is almost always identical.
     @State private var burnInOffset: CGPoint = .zero
 
+    /// Whether the Metal tube is both asked for and actually present.
+    ///
+    /// Falls back to the animated `Canvas` overlay rather than to nothing, so a build
+    /// without the metallib still looks intentional instead of losing the effect.
+    private var usesTube: Bool {
+        settings.screenEffect == .tube && CRTEffect.isAvailable
+    }
+
+    private var tubeSettings: CRTSettings? {
+        guard usesTube else { return nil }
+        var tube = CRTSettings()
+        // The scanline choice still governs how heavy the lines are; `.off` means a clean
+        // tube with curvature and bloom but no mask.
+        switch settings.scanlines {
+        case .off: tube.scanlineDepth = 0
+        case .hairline: tube.scanlineDepth = 0.12
+        case .thin: tube.scanlineDepth = 0.18
+        case .medium: tube.scanlineDepth = 0.24
+        case .thick: tube.scanlineDepth = 0.32
+        }
+        return tube
+    }
+
     public init() {}
 
     public var body: some View {
@@ -41,14 +64,25 @@ public struct WeatherStarView: View {
                     canvas(metrics: metrics)
                         .environment(\.starMetrics, metrics)
 
-                    Scanlines(
-                        mode: settings.scanlines,
-                        animated: settings.animatedScanlines
-                    )
-                    .environment(\.starMetrics, metrics)
-                    .frame(width: metrics.scaledSize.width, height: metrics.scaledSize.height)
+                    // The tube draws its own scanlines in the shader, where they can stay
+                    // straight while the picture bends. Overlaying these as well would
+                    // curve one set of lines and not the other.
+                    if !usesTube {
+                        Scanlines(
+                            mode: settings.scanlines,
+                            animated: settings.screenEffect == .animated
+                        )
+                        .environment(\.starMetrics, metrics)
+                        .frame(width: metrics.scaledSize.width, height: metrics.scaledSize.height)
+                    }
                 }
                 .offset(x: burnInOffset.x, y: burnInOffset.y)
+                // Opaque before the shader samples it. A layer with transparent regions
+                // makes every per-channel read a premultiplied one, and the tube has to
+                // guess at alpha it cannot reconstruct; giving it a solid picture removes
+                // the question. The outer black is still there for the letterbox.
+                .background(Color.black)
+                .crtEffect(tubeSettings, size: proxy.size)
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
             .onAppear { metricsWidth = space.width }

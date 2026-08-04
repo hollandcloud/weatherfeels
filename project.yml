@@ -62,6 +62,10 @@ targetTemplates:
     type: application
     sources:
       - path: Apps/${platformDir}
+      # The CRT shader has to be compiled by Xcode into each app's default.metallib:
+      # SwiftPM will not build `.metal` inside the package, so it cannot live beside the
+      # view that uses it. `ShaderLibrary.default` then finds it in the main bundle.
+      - path: Shaders/StarCRT.metal
     dependencies:
       - package: WeatherStarCore
         product: WeatherStarUI

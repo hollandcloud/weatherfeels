@@ -46,6 +46,38 @@ public enum ScanlineMode: String, Codable, Sendable, CaseIterable {
     }
 }
 
+/// How much of a cathode-ray tube to simulate over the displays.
+public enum ScreenEffect: String, Codable, Sendable, CaseIterable {
+    /// Just the static scanline overlay from `ScanlineMode`.
+    case plain
+    /// Scanlines that drift, plus the roll bar of a CRT filmed off-screen. Drawn in
+    /// `Canvas`, so it works everywhere.
+    case animated
+    /// The full tube: barrel curvature, phosphor bloom, convergence fringing and corner
+    /// falloff, through the `StarCRT` Metal shader. Falls back to `animated` where the
+    /// shader is unavailable.
+    case tube
+
+    public var displayName: String {
+        switch self {
+        case .plain: "Static"
+        case .animated: "Animated"
+        case .tube: "CRT tube"
+        }
+    }
+
+    public var detail: String {
+        switch self {
+        case .plain:
+            "Plain scanlines, drawn once."
+        case .animated:
+            "Scanlines drift and a soft roll bar creeps down the screen."
+        case .tube:
+            "Curved glass, phosphor bloom and colour fringing, drawn on the GPU."
+        }
+    }
+}
+
 /// Playback speed multiplier applied to every display's dwell time.
 public enum PlaybackSpeed: String, Codable, Sendable, CaseIterable {
     case fast
@@ -91,7 +123,7 @@ public final class AppSettings {
         speed = defaults.decoded(Key.speed, default: .normal)
         storedRefreshMinutes = min(max(defaults.value(forKey: Key.refreshMinutes) as? Int ?? 10, 5), 60)
         clockSeconds = defaults.bool(forKey: Key.clockSeconds, default: true)
-        animatedScanlines = defaults.bool(forKey: Key.animatedScanlines, default: false)
+        screenEffect = defaults.decoded(Key.screenEffect, default: .plain)
         // Defaults on only for Apple TV. A television is the panel at risk of burn-in and
         // the device most likely to be left showing this for hours; nudging a phone or a
         // Mac window around would be noise for no benefit.
@@ -136,12 +168,10 @@ public final class AppSettings {
     public var speed: PlaybackSpeed { didSet { defaults.encode(speed, Key.speed) } }
     public var clockSeconds: Bool { didSet { defaults.set(clockSeconds, forKey: Key.clockSeconds) } }
 
-    /// Give the scanlines the slow drift and roll bar of a taped broadcast.
-    ///
-    /// Costs a redraw of one full-screen overlay at 24fps, so it is a choice rather than
-    /// the default.
-    public var animatedScanlines: Bool {
-        didSet { defaults.set(animatedScanlines, forKey: Key.animatedScanlines) }
+    /// How much CRT to simulate. Anything beyond `.plain` redraws every frame, so the
+    /// default stays static.
+    public var screenEffect: ScreenEffect {
+        didSet { defaults.encode(screenEffect, Key.screenEffect) }
     }
 
     /// Walk the canvas a few points around its centre to avoid burning in the header,
@@ -286,7 +316,7 @@ private enum Key {
     static let speed = prefix + "speed"
     static let refreshMinutes = prefix + "refreshMinutes"
     static let clockSeconds = prefix + "clockSeconds"
-    static let animatedScanlines = prefix + "animatedScanlines"
+    static let screenEffect = prefix + "screenEffect"
     static let burnInProtection = prefix + "burnInProtection"
     static let enabledDisplays = prefix + "enabledDisplays"
     static let hasCompletedOnboarding = prefix + "hasCompletedOnboarding"
