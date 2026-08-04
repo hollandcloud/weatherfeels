@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>WeatherStar</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<!-- Required for Mac App Store submission; the upload is rejected without it.
+	     Must be a real category UTI, and it also sets the category shown on the
+	     store listing. -->
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.weather</string>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>WeatherStar plays a playlist from your Apple Music library behind the weather displays. Your library is only read on this device and never leaves it.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>WeatherStar uses your location to show the local forecast from the National Weather Service. Your location is never stored or shared.</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>MIT licensed. Weather data courtesy of NOAA/NWS.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+</dict>
+</plist>

@@ -1,0 +1,206 @@
+#if os(macOS)
+import ImageIO
+import SwiftUI
+import Testing
+@testable import WeatherStarKit
+@testable import WeatherStarUI
+
+/// Renders the onboarding and settings screens to `/tmp/ws4k-ux` for review.
+///
+/// These are SwiftUI *system* views — Form, NavigationStack, Button — so macOS
+/// renders them with macOS control styling rather than tvOS's or iOS's. That makes
+/// them useful for checking content, structure, ordering and copy, but not for
+/// judging platform chrome.
+///
+/// Since the forms adopted `.formStyle(.grouped)`, these renders come out **empty**: a
+/// grouped form puts its rows inside a ScrollView, which `ImageRenderer` will not lay
+/// out without a hosting window. The tests still catch a view that fails to build at
+/// all, but the images are no longer a way to review settings layout — that has to be
+/// done by running the app. The weather displays are custom-drawn and therefore
+/// pixel-accurate anywhere, which is why they live in `DisplaySnapshotTests`.
+@Suite("Onboarding and settings snapshots")
+@MainActor
+struct OnboardingSnapshotTests {
+    private static let outputDirectory = URL(fileURLWithPath: "/tmp/ws4k-ux")
+
+    /// Roughly a 16:9 TV pane and a phone, so both layouts get exercised.
+    private static let tvSize = CGSize(width: 1280, height: 720)
+    private static let phoneSize = CGSize(width: 402, height: 874)
+
+    private func settings(configure: (AppSettings) -> Void = { _ in }) -> AppSettings {
+        // Isolated domain so snapshots never disturb real preferences.
+        let suite = "ws4k.ux.\(UUID().uuidString)"
+        let store = AppSettings(defaults: UserDefaults(suiteName: suite)!)
+        configure(store)
+        return store
+    }
+
+    @discardableResult
+    private func render(_ view: some View, named name: String, size: CGSize) -> CGImage? {
+        StarFontLoader.registerFonts()
+        try? FileManager.default.createDirectory(
+            at: Self.outputDirectory, withIntermediateDirectories: true
+        )
+
+        let renderer = ImageRenderer(
+            content: view.frame(width: size.width, height: size.height)
+        )
+        renderer.scale = 2
+        guard let image = renderer.cgImage else { return nil }
+
+        if let destination = CGImageDestinationCreateWithURL(
+            Self.outputDirectory.appendingPathComponent("\(name).png") as CFURL,
+            "public.png" as CFString, 1, nil
+        ) {
+            CGImageDestinationAddImage(destination, image, nil)
+            CGImageDestinationFinalize(destination)
+        }
+        return image
+    }
+
+    // MARK: - Onboarding
+
+    @Test("Each onboarding step renders")
+    func onboardingSteps() throws {
+        for step in OnboardingView.Step.allCases {
+            let store = settings()
+            let view = OnboardingView(startingAt: step) {}
+                .environment(store)
+                .environment(LocationService.shared)
+
+            let image = render(view, named: "onboarding-\(step.rawValue)-\(step)", size: Self.tvSize)
+            #expect(image != nil, "step \(step) failed to render")
+        }
+    }
+
+    // MARK: - Settings
+
+    @Test("Settings renders with a location already chosen")
+    func settingsConfigured() throws {
+        let store = settings {
+            $0.savedLocation = SavedLocation(
+                name: "Orlando, FL", latitude: 28.5383, longitude: -81.3792
+            )
+            $0.locationMode = .manual
+            $0.units = .us
+            $0.musicEnabled = true
+            $0.setEnabled(true, for: .hourly)
+        }
+        let library = MusicLibrary(settings: store)
+
+        let view = SettingsView { _ in }
+            .environment(store)
+            .environment(LocationService.shared)
+            .environment(library)
+
+        #expect(render(view, named: "settings-tv", size: Self.tvSize) != nil)
+        #expect(render(view, named: "settings-phone", size: Self.phoneSize) != nil)
+    }
+
+    @Test("Music settings renders for each source")
+    func musicSettingsPerSource() throws {
+        for source in MusicSourceKind.allCases {
+            let store = settings {
+                $0.musicSource = source
+                $0.remoteMusicURLString = "http://nas.local:8080"
+                $0.uploadPath = "/music/custom"
+            }
+            let view = MusicSettingsView()
+                .environment(store)
+                .environment(MusicLibrary(settings: store))
+                .environment(MusicTransfer(settings: store))
+                .environment(MusicPlayer())
+
+            #expect(
+                render(view, named: "music-\(source.rawValue)", size: Self.tvSize) != nil,
+                "music source \(source) failed to render"
+            )
+        }
+    }
+
+    /// Mirrors `RootView.settingsScreen`: the panel is composited over a live display,
+    /// so the backdrop has to be opaque enough for the options to read. A material
+    /// alone resolved light on tvOS while the text stayed light, making it invisible.
+    @Test("The settings panel is readable over a running display")
+    func settingsPanelContrast() throws {
+        let store = settings {
+            $0.savedLocation = SavedLocation(
+                name: "Orlando, FL", latitude: 28.5383, longitude: -81.3792
+            )
+        }
+
+        let panel = ZStack {
+            // Stand-in for the weather display showing through from behind.
+            LinearGradient(
+                colors: [.orange, .blue],
+                startPoint: .topLeading, endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+
+            ZStack {
+                LinearGradient(
+                    colors: [Color(white: 0.10), Color(white: 0.04)],
+                    startPoint: .top, endPoint: .bottom
+                )
+                .ignoresSafeArea()
+
+                SettingsView { _ in }
+                    .environment(store)
+                    .environment(LocationService.shared)
+                    .environment(MusicLibrary(settings: store))
+            }
+            .environment(\.colorScheme, .dark)
+        }
+
+        let image = try #require(render(panel, named: "settings-over-display", size: Self.tvSize))
+
+        // Sample the panel interior: it must be dark, or light text will not read.
+        let width = image.width
+        let height = image.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let context = pixels.withUnsafeMutableBytes { buffer in
+            CGContext(
+                data: buffer.baseAddress, width: width, height: height,
+                bitsPerComponent: 8, bytesPerRow: width * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )!
+        }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let data = UnsafeBufferPointer(
+            start: context.data!.assumingMemoryBound(to: UInt8.self),
+            count: width * height * 4
+        )
+
+        // Average luminance across the middle of the panel.
+        var total = 0
+        var samples = 0
+        for row in stride(from: height / 3, to: height * 2 / 3, by: 8) {
+            for column in stride(from: width / 3, to: width * 2 / 3, by: 8) {
+                let index = (row * width + column) * 4
+                total += (Int(data[index]) + Int(data[index + 1]) + Int(data[index + 2])) / 3
+                samples += 1
+            }
+        }
+        let average = samples > 0 ? total / samples : 255
+        #expect(
+            average < 110,
+            "panel interior averages \(average)/255 — too light for the light text to read"
+        )
+    }
+
+    @Test("The location picker renders with recents")
+    func locationPicker() throws {
+        let store = settings {
+            $0.rememberRecent(SavedLocation(name: "Tampa, FL", latitude: 27.95, longitude: -82.46))
+            $0.rememberRecent(SavedLocation(name: "Orlando, FL", latitude: 28.54, longitude: -81.38))
+        }
+        let view = NavigationStack {
+            LocationPickerView { _ in }
+                .environment(store)
+                .environment(LocationService.shared)
+        }
+        #expect(render(view, named: "location-picker", size: Self.tvSize) != nil)
+    }
+}
+#endif
