@@ -114,6 +114,13 @@ public struct StarDisplayFrame<Content: View>: View {
         metrics.space.width - Layout.clockWidth - Layout.clockRightMargin
     }
 
+    /// Design-space height available to the content, between header and ticker.
+    private var availableContentHeight: CGFloat {
+        metrics.space.height
+            - (display.drawsHeader ? Layout.headerHeight : 0)
+            - (display.showsScroll ? ScrollTicker.height : 0)
+    }
+
     public var body: some View {
         ZStack(alignment: .topLeading) {
             StarBackground(style: display.backgroundStyle)
@@ -123,6 +130,15 @@ public struct StarDisplayFrame<Content: View>: View {
                     \.starContentWidth,
                     display.expandsToWideCanvas ? metrics.space.width : 640
                 )
+                // Bounded to what is actually free between the header and the ticker.
+                //
+                // Without this the content is proposed the *whole* canvas height and then
+                // offset down past the header, so anything that fills its height hangs off
+                // the bottom by exactly the header's 90pt and is lost to the frame's clip.
+                // Displays that position everything absolutely never noticed; the startup
+                // screen, which lays out a VStack, lost its credit line, its link and its
+                // progress bar.
+                .designFrame(height: availableContentHeight, alignment: .top)
                 .designOffset(
                     x: display.expandsToWideCanvas ? 0 : contentInset,
                     y: display.drawsHeader ? Layout.headerHeight : 0

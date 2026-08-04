@@ -44,9 +44,19 @@ public enum CRTEffect {
 /// Tuning for the tube. Defaults are deliberately restrained — the displays have to stay
 /// legible from across a room, and this sits over every one of them.
 public struct CRTSettings: Equatable, Sendable {
-    /// Barrel strength. Mild by default: the corners of the widescreen canvas carry the
-    /// clock and the logo, and a rounder tube starts to eat them.
-    public var curvature: Double = 0.028
+    /// Barrel strength.
+    ///
+    /// Halved from 0.028 after bisecting a real artifact: at that value the ticker's small
+    /// location label lost the top of every glyph, so "TAMPA" rendered as "|AMP/". Turning
+    /// each stage off in isolation cleared curvature's neighbours — mask, convergence, bloom
+    /// and vignette are all innocent — and the label survives intact at 0.014 and below.
+    /// Filtering the warp along its axis of compression, which is in the shader and worth
+    /// keeping, did not rescue it on its own, so the displacement itself is the limit.
+    ///
+    /// This is a mitigation rather than a full explanation: the exact boundary the label's
+    /// top row crosses is not pinned down. `ws4k.debug.crt.curvature` dials it in a Debug
+    /// build if you want a rounder tube and can live with that label.
+    public var curvature: Double = 0.014
     public var scanlineDepth: Double = 0.22
     /// Points between scanline centres.
     ///
@@ -65,7 +75,35 @@ public struct CRTSettings: Equatable, Sendable {
     public var bloom: Double = 0.22
     public var vignette: Double = 0.28
 
-    public init() {}
+    public init() {
+        #if DEBUG
+        // Debug builds let each stage be dialled from the outside, so the tube can be
+        // bisected and tuned on a real device without a rebuild per value:
+        //
+        //   defaults write net.hlnd.weatherstar ws4k.debug.crt.bloom -float 0
+        //
+        // Absent keys leave the defaults above untouched. Compiled out of Release, so a
+        // shipped build cannot be reconfigured this way.
+        applyDebugOverrides()
+        #endif
+    }
+
+    #if DEBUG
+    private mutating func applyDebugOverrides() {
+        let defaults = UserDefaults.standard
+        func override(_ name: String, into value: inout Double) {
+            let key = "ws4k.debug.crt.\(name)"
+            guard defaults.object(forKey: key) != nil else { return }
+            value = defaults.double(forKey: key)
+        }
+        override("curvature", into: &curvature)
+        override("scanlineDepth", into: &scanlineDepth)
+        override("linePeriod", into: &linePeriod)
+        override("aberration", into: &aberration)
+        override("bloom", into: &bloom)
+        override("vignette", into: &vignette)
+    }
+    #endif
 }
 
 private struct CRTModifier: ViewModifier {

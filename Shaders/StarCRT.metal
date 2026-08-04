@@ -66,12 +66,27 @@ using namespace metal;
     // Convergence error grows towards the edges on a real tube, so scale it by radius
     // rather than applying it evenly. `1e-6` keeps `normalize` away from zero at the
     // exact centre, where the direction is undefined.
-    float2 fringe = normalize(centred + 1e-6) * aberration * radiusSquared;
-    half4 centre = layer.sample(source);
+    float2 radial = normalize(centred + 1e-6);
+    float2 fringe = radial * aberration * radiusSquared;
+
+    // Filtered along the radial axis, because that is the direction the warp compresses.
+    //
+    // `layer.sample` is bilinear with nothing to prefilter minification, and the warp
+    // squeezes the picture as it approaches the glass — so a single tap per channel simply
+    // *skipped* source rows. On body text that is invisible; on the ticker's small label it
+    // deleted the top of every glyph and the thin arm of a "T", which read as the text being
+    // clipped rather than filtered. Two taps straddling the sample point turn a dropped
+    // stroke into a dimmer one, which is what minification is supposed to look like.
+    const float spread = 0.4 + 0.6 * radiusSquared;
+    float2 filterStep = radial * spread * 0.5;
+
+    half4 centre = 0.5h * (layer.sample(source - filterStep) + layer.sample(source + filterStep));
     half4 colour;
-    colour.r = layer.sample(source + fringe).r;
+    colour.r = 0.5h * (layer.sample(source + fringe - filterStep)
+                     + layer.sample(source + fringe + filterStep)).r;
     colour.g = centre.g;
-    colour.b = layer.sample(source - fringe).b;
+    colour.b = 0.5h * (layer.sample(source - fringe - filterStep)
+                     + layer.sample(source - fringe + filterStep)).b;
     // Carry the sampled alpha through. Forcing this to 1 turned every transparent pixel
     // into opaque black, which drew a black box around each run of text — the layer is
     // premultiplied, so its transparent regions are (0,0,0,0), and claiming they were
