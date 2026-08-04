@@ -20,11 +20,50 @@ public struct WeatherStarView: View {
 
     /// Whether the Metal tube is both asked for and actually present.
     ///
-    /// Falls back to the animated `Canvas` overlay rather than to nothing, so a build
-    /// without the metallib still looks intentional instead of losing the effect.
+    /// Falls back to the drawn overlay rather than to nothing, so a build without the
+    /// metallib still looks intentional instead of losing the effect.
     private var usesTube: Bool {
         settings.screenEffect == .tube && CRTEffect.isAvailable
     }
+
+    /// Drifting lines on the GPU: asked for, and the shader is there.
+    private var usesShaderLines: Bool {
+        settings.screenEffect == .animated && CRTEffect.isAvailable
+    }
+
+    /// Whether the drawn `Canvas` overlay is doing the work.
+    ///
+    /// Still the right choice for `.plain`: a static overlay rasterises once and costs
+    /// nothing per frame, where a shader would add a pass to every frame to draw something
+    /// that never changes.
+    private var usesDrawnOverlay: Bool {
+        !usesTube && !usesShaderLines
+    }
+
+    private var shaderLineSettings: ScanlineShaderSettings? {
+        guard usesShaderLines else { return nil }
+        let thickness = Scanlines.designThickness(for: settings.scanlines)
+        guard thickness > 0 else { return nil }
+        return ScanlineShaderSettings(
+            depth: scanlineDepth,
+            // The same 480-line pitch the tube uses.
+            period: max(1.5, metricsHeightForLines / 480)
+        )
+    }
+
+    /// Line darkness for the current scanline setting, shared by both shader paths.
+    private var scanlineDepth: Double {
+        switch settings.scanlines {
+        case .off: 0
+        case .hairline: 0.12
+        case .thin: 0.18
+        case .medium: 0.24
+        case .thick: 0.32
+        }
+    }
+
+    /// Canvas height in points, captured for the line pitch.
+    @State private var metricsHeightForLines: CGFloat = 480
 
     private func tubeSettings(metrics: StarMetrics) -> CRTSettings? {
         guard usesTube else { return nil }
@@ -32,13 +71,7 @@ public struct WeatherStarView: View {
 
         // The scanline choice still governs how heavy the lines are; `.off` means a clean
         // tube with curvature and bloom but no mask.
-        switch settings.scanlines {
-        case .off: tube.scanlineDepth = 0
-        case .hairline: tube.scanlineDepth = 0.12
-        case .thin: tube.scanlineDepth = 0.18
-        case .medium: tube.scanlineDepth = 0.24
-        case .thick: tube.scanlineDepth = 0.32
-        }
+        tube.scanlineDepth = scanlineDepth
 
         // One line per row of the original 480-line raster, which is what a tube actually
         // did and keeps the pitch proportional to the picture at any resolution.
@@ -77,10 +110,10 @@ public struct WeatherStarView: View {
                     canvas(metrics: metrics)
                         .environment(\.starMetrics, metrics)
 
-                    // The tube draws its own scanlines in the shader, where they can stay
-                    // straight while the picture bends. Overlaying these as well would
-                    // curve one set of lines and not the other.
-                    if !usesTube {
+                    // Both shader paths draw their own lines, so the overlay would double
+                    // them up — and for the tube it would curve one set and not the other,
+                    // since the shader keys its mask off the face of the glass.
+                    if usesDrawnOverlay {
                         Scanlines(
                             mode: settings.scanlines,
                             animated: settings.screenEffect == .animated
@@ -96,10 +129,17 @@ public struct WeatherStarView: View {
                 // the question. The outer black is still there for the letterbox.
                 .background(Color.black)
                 .crtEffect(tubeSettings(metrics: metrics), size: proxy.size)
+                .scanlineEffect(shaderLineSettings, size: proxy.size)
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
-            .onAppear { metricsWidth = space.width }
+            .onAppear {
+                metricsWidth = space.width
+                metricsHeightForLines = metrics.scaledSize.height
+            }
             .onChange(of: space.width) { _, width in metricsWidth = width }
+            .onChange(of: metrics.scaledSize.height) { _, height in
+                metricsHeightForLines = height
+            }
         }
         .ignoresSafeArea()
         .background(Color.black)

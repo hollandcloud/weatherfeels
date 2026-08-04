@@ -18,6 +18,55 @@
 
 using namespace metal;
 
+/// Drifting scanlines and a roll bar, without the rest of the tube.
+///
+/// A `colorEffect` rather than a `layerEffect`: this only ever needs the pixel it is
+/// writing, so it does no texture reads at all and SwiftUI has no reason to rasterise the
+/// content into an offscreen layer. That makes it enormously cheaper than the full tube,
+/// and cheaper still than compositing a `Canvas` overlay every frame — which is what this
+/// replaces, and which was severely slow on a real Apple TV at 4K.
+///
+/// The phase and the roll bar's position are computed by the caller and passed in already
+/// wrapped, rather than deriving them here from a wall-clock `time`. Seconds since 2001 is
+/// ~8×10⁸, and at `float` precision there is not enough mantissa left for a smooth drift —
+/// the pattern would visibly step.
+///
+/// - Parameters:
+///   - position: destination point in the view's coordinate space (points).
+///   - colour: the pixel already rendered there, premultiplied.
+///   - scanPhase: vertical offset of the line pattern, in points.
+///   - scanDepth: how dark the lines get, 0...1.
+///   - linePeriod: points between line centres.
+///   - rollCentre: y of the roll bar's middle, in points. May sit outside the view.
+///   - rollHeight: full height of the roll bar, in points.
+///   - rollStrength: peak brightening at the bar's centre.
+[[ stitchable ]] half4 starScanlines(
+    float2 position,
+    half4 colour,
+    float scanPhase,
+    float scanDepth,
+    float linePeriod,
+    float rollCentre,
+    float rollHeight,
+    float rollStrength
+) {
+    if (scanDepth > 0.0 && linePeriod > 0.0) {
+        float phase = (position.y + scanPhase) / linePeriod;
+        float mask = 0.5 + 0.5 * cos(phase * 6.283185307);
+        colour.rgb *= half(1.0 - scanDepth * mask);
+    }
+
+    if (rollStrength > 0.0 && rollHeight > 0.0) {
+        float falloff = saturate(1.0 - abs(position.y - rollCentre) / (rollHeight * 0.5));
+        // Smoothstep, so the band has no hard edge where it meets the picture.
+        float band = falloff * falloff * (3.0 - 2.0 * falloff);
+        // Scaled by alpha because the colour arrives premultiplied.
+        colour.rgb += half3(half(rollStrength * band)) * colour.a;
+    }
+
+    return colour;
+}
+
 /// Everything a curved phosphor tube does to a picture, in one pass.
 ///
 /// Ordered the way the physical effects actually compose: geometry first (the glass bends

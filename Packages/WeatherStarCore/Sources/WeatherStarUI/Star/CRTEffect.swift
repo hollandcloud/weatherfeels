@@ -142,7 +142,71 @@ private struct CRTModifier: ViewModifier {
     }
 }
 
+/// Tuning for the drifting-lines-only effect.
+public struct ScanlineShaderSettings: Equatable, Sendable {
+    /// How dark the lines get.
+    public var depth: Double
+    /// Points between line centres.
+    public var period: Double
+    /// Seconds for the pattern to travel one period.
+    public var driftPeriod: Double = 6
+    /// Seconds for the roll bar to cross the screen.
+    public var rollPeriod: Double = 9
+    /// Roll bar height as a fraction of the view.
+    public var rollFraction: Double = 0.14
+    public var rollStrength: Double = 0.05
+
+    public init(depth: Double, period: Double) {
+        self.depth = depth
+        self.period = period
+    }
+}
+
+private struct ScanlineShaderModifier: ViewModifier {
+    let settings: ScanlineShaderSettings
+    let size: CGSize
+
+    func body(content: Content) -> some View {
+        TimelineView(
+            .animation(minimumInterval: CRTEffect.frameInterval, paused: false)
+        ) { timeline in
+            let time = timeline.date.timeIntervalSinceReferenceDate
+
+            // Wrapped here, not in the shader: see `starScanlines`.
+            let drift = settings.period
+                * (time / settings.driftPeriod).truncatingRemainder(dividingBy: 1)
+            let rollHeight = size.height * settings.rollFraction
+            let travel = (time / settings.rollPeriod).truncatingRemainder(dividingBy: 1)
+            let rollCentre = -rollHeight / 2 + travel * (size.height + rollHeight)
+
+            content.colorEffect(
+                ShaderLibrary.default.starScanlines(
+                    .float(drift),
+                    .float(settings.depth),
+                    .float(settings.period),
+                    .float(rollCentre),
+                    .float(rollHeight),
+                    .float(settings.rollStrength)
+                )
+            )
+        }
+    }
+}
+
 public extension View {
+    /// Apply the drifting scanlines and roll bar on the GPU.
+    ///
+    /// A no-op without the shader, so the caller falls back to the drawn `Scanlines`
+    /// overlay instead of silently losing the effect.
+    @ViewBuilder
+    func scanlineEffect(_ settings: ScanlineShaderSettings?, size: CGSize) -> some View {
+        if let settings, CRTEffect.isAvailable, size.height > 0 {
+            modifier(ScanlineShaderModifier(settings: settings, size: size))
+        } else {
+            self
+        }
+    }
+
     /// Apply the CRT tube, when the shader is available and asked for.
     ///
     /// A no-op otherwise, so a caller never has to know whether the metallib shipped.

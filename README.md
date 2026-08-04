@@ -86,8 +86,16 @@ canvas only when it actually moves.
 
 **Screen effect** — `Static` (default), `Animated`, or `CRT tube`.
 
-*Animated* drifts the scanlines and creeps a soft roll bar down the screen, drawn in
-`Canvas` at 24fps so it works everywhere.
+*Animated* drifts the scanlines and creeps a soft roll bar down the screen. It is a
+`colorEffect` — the cheapest shader shape there is, because it only ever needs the pixel it
+is writing, so it does no texture reads and SwiftUI never rasterises an offscreen layer.
+
+It started life as a `Canvas` overlay, on the reasoning that two fills a frame would get the
+same look more simply. On a real Apple TV at 4K that was severely slow, and the reason is
+worth recording: the `Canvas` closure re-ran every frame, rebuilding a path of several
+hundred rectangles and rasterising it on the CPU at output resolution. The Mac's CPU hid it
+completely in the simulator. Translating a cached drawing instead of redrawing helped, but a
+shader is the right tool and is now the default whenever the metallib is present.
 
 *CRT tube* is [`Shaders/StarCRT.metal`](Shaders/StarCRT.metal): barrel curvature, phosphor
 bloom, convergence fringing that grows towards the edges, the scanline mask and corner
@@ -100,6 +108,11 @@ The `Scanlines` setting still sets how heavy the mask is, and `Off` gives a clea
 curvature and bloom but no lines.
 
 Two things that shape how this is wired:
+
+When the metallib is absent — the package's snapshot tests, or any build without it — both
+modes fall back to the drawn `Canvas` overlay rather than losing the effect. `.plain` always
+uses the drawn overlay: a static pattern rasterises once and costs nothing per frame, where
+a shader would add a pass to every frame to redraw something that never changes.
 
 **The shader cannot live in the package.** SwiftPM does not compile `.metal` in a package
 target — it reports the file as an unhandled resource and produces no metallib. So it sits
