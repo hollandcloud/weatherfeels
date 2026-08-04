@@ -48,6 +48,12 @@ using namespace metal;
     float bloom,
     float vignette
 ) {
+    // A degenerate size would divide the picture into nonsense, so pass it through
+    // untouched rather than render something wrong.
+    if (size.x < 1.0 || size.y < 1.0) {
+        return layer.sample(position);
+    }
+
     // -1...1 with the origin at the centre of the tube.
     float2 centred = (position / size) * 2.0 - 1.0;
 
@@ -56,12 +62,18 @@ using namespace metal;
     float radiusSquared = dot(centred, centred);
     float2 warped = centred * (1.0 + curvature * radiusSquared);
 
-    // Past the edge of the glass there is no picture, only bezel.
-    if (any(abs(warped) > 1.0)) {
-        return half4(0.0h, 0.0h, 0.0h, 1.0h);
-    }
+    // Past the edge of the glass there is bezel — but reached by clamping and darkening
+    // rather than by returning early.
+    //
+    // An early `return black` makes a coordinate-space mismatch catastrophic: if `size`
+    // ever disagrees with the layer's own bounds, *every* pixel tests as outside and the
+    // whole screen goes black, which is what happened on a real Apple TV while the
+    // simulator was fine. Clamping degrades to a slightly stretched edge instead, and the
+    // bezel still appears because `beyond` only becomes non-zero outside the glass.
+    float2 clamped = clamp(warped, -1.0, 1.0);
+    float beyond = length(warped - clamped);
 
-    float2 source = ((warped + 1.0) * 0.5) * size;
+    float2 source = ((clamped + 1.0) * 0.5) * size;
 
     // Convergence error grows towards the edges on a real tube, so scale it by radius
     // rather than applying it evenly. `1e-6` keeps `normalize` away from zero at the
@@ -122,6 +134,11 @@ using namespace metal;
     // Tube falloff towards the corners.
     float falloff = 1.0 - vignette * radiusSquared * 0.5;
     colour.rgb *= half(clamp(falloff, 0.0, 1.0));
+
+    // Bezel: fade to black over the short distance past the edge of the glass. Replaces
+    // the early return, so an unexpected coordinate range costs a stretched edge rather
+    // than the entire picture.
+    colour.rgb *= half(saturate(1.0 - beyond * 40.0));
 
     return colour;
 }

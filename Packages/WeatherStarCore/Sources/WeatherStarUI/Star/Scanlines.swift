@@ -9,12 +9,10 @@ import WeatherStarKit
 /// design height rather than from output pixels is what prevents the moiré banding
 /// you get when a fixed 1px pattern is resampled to an arbitrary screen size.
 ///
-/// Drawn with `Canvas` rather than a Metal shader. SwiftPM does not compile `.metal`
-/// files in a package target — it reports them as unhandled resources — so a shader would
-/// have to be added to each of the three app targets and reached through
-/// `ShaderLibrary.default`. That also puts it out of reach of the snapshot tests, which
-/// render outside any app bundle, and a missing shader function traps at render time. Two
-/// fills per frame gets the same look and stays verifiable everywhere.
+/// This is the `Canvas` overlay used for the static and animated modes; the full CRT tube
+/// is a Metal shader in `CRTEffect`. Keeping a drawn version matters because it works
+/// wherever there is no metallib — notably the package's own snapshot tests — and because
+/// it is far cheaper than the shader when nothing needs to move.
 public struct Scanlines: View {
     @Environment(\.starMetrics) private var metrics
 
@@ -66,20 +64,82 @@ public struct Scanlines: View {
         if mode == .off {
             Color.clear.allowsHitTesting(false)
         } else if isAnimated {
-            TimelineView(.animation(minimumInterval: Self.frameInterval, paused: false)) { timeline in
-                // No `.drawingGroup()` here: it adds an offscreen pass, which pays for
-                // itself on a static overlay and costs on one that redraws every frame.
-                canvas(at: timeline.date.timeIntervalSinceReferenceDate)
-            }
-            .allowsHitTesting(false)
+            animated.allowsHitTesting(false)
         } else {
-            canvas(at: nil)
+            canvas
                 .drawingGroup()
                 .allowsHitTesting(false)
         }
     }
 
-    private func canvas(at time: Double?) -> some View {
+    /// Animated by *translating* a drawing made once, not by redrawing it.
+    ///
+    /// The first version re-ran the `Canvas` closure every frame, which rebuilt a path of
+    /// several hundred rectangles and rasterised it on the CPU at whatever the output
+    /// resolution is. On a real Apple TV at 4K that was severely slow — fine in the
+    /// simulator, where the Mac's CPU hides it.
+    ///
+    /// Here the pattern and the roll bar are constant views, so they rasterise once and
+    /// each frame only changes an `offset`, which is a transform on an existing layer.
+    private var animated: some View {
+        GeometryReader { proxy in
+            let period = max(1, metrics.s(lineThickness) * 2)
+            let barHeight = proxy.size.height * 0.14
+
+            TimelineView(.animation(minimumInterval: Self.frameInterval, paused: false)) { timeline in
+                let time = timeline.date.timeIntervalSinceReferenceDate
+                let drift = period * ((time / Self.driftPeriod).truncatingRemainder(dividingBy: 1))
+                let travel = (time / Self.rollPeriod).truncatingRemainder(dividingBy: 1)
+
+                ZStack(alignment: .top) {
+                    // Drawn one period taller at each end so translating it never exposes
+                    // a seam.
+                    linePattern(size: proxy.size, period: period)
+                        .offset(y: drift - period)
+
+                    rollBar(height: barHeight)
+                        .offset(y: -barHeight + travel * (proxy.size.height + barHeight * 2))
+                }
+            }
+        }
+    }
+
+    /// The line pattern, rasterised once and reused for every frame.
+    private func linePattern(size: CGSize, period: CGFloat) -> some View {
+        let thickness = period / 2
+        return Canvas(opaque: false, rendersAsynchronously: false) { context, canvasSize in
+            guard thickness >= 0.75 else {
+                context.fill(
+                    Path(CGRect(origin: .zero, size: canvasSize)),
+                    with: .color(.black.opacity(opacity / 2))
+                )
+                return
+            }
+            var path = Path()
+            var y: CGFloat = 0
+            while y < canvasSize.height {
+                path.addRect(CGRect(x: 0, y: y, width: canvasSize.width, height: thickness))
+                y += period
+            }
+            context.fill(path, with: .color(.black.opacity(opacity)))
+        }
+        .frame(width: size.width, height: size.height + period * 2)
+        .drawingGroup()
+    }
+
+    /// The soft band that creeps down a CRT filmed off a screen — a plain gradient, so it
+    /// costs a transform per frame rather than a redraw.
+    private func rollBar(height: CGFloat) -> some View {
+        LinearGradient(
+            colors: [.white.opacity(0), .white.opacity(0.045), .white.opacity(0)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(height: height)
+    }
+
+    /// The static overlay: drawn once and cached by the caller's `.drawingGroup()`.
+    private var canvas: some View {
         Canvas(opaque: false, rendersAsynchronously: false) { context, size in
             let thickness = metrics.s(lineThickness)
             let period = thickness * 2
@@ -94,47 +154,13 @@ public struct Scanlines: View {
                 return
             }
 
-            let phase = time.map {
-                period * (($0 / Self.driftPeriod).truncatingRemainder(dividingBy: 1))
-            } ?? 0
-
-            // Begin one period above the top so the drifting pattern has no seam.
             var path = Path()
-            var y = phase - period
+            var y: CGFloat = 0
             while y < size.height {
                 path.addRect(CGRect(x: 0, y: y, width: size.width, height: thickness))
                 y += period
             }
             context.fill(path, with: .color(.black.opacity(opacity)))
-
-            if let time {
-                drawRollBar(in: &context, size: size, time: time)
-            }
         }
-    }
-
-    /// The soft horizontal band that creeps down a CRT filmed off a screen.
-    private func drawRollBar(
-        in context: inout GraphicsContext,
-        size: CGSize,
-        time: Double
-    ) {
-        let travel = (time / Self.rollPeriod).truncatingRemainder(dividingBy: 1)
-        let height = size.height * 0.14
-        // Enters above the top and leaves below the bottom, so it never pops.
-        let y = -height + travel * (size.height + height * 2)
-
-        context.fill(
-            Path(CGRect(x: 0, y: y, width: size.width, height: height)),
-            with: .linearGradient(
-                Gradient(colors: [
-                    .white.opacity(0),
-                    .white.opacity(0.045),
-                    .white.opacity(0),
-                ]),
-                startPoint: CGPoint(x: 0, y: y),
-                endPoint: CGPoint(x: 0, y: y + height)
-            )
-        )
     }
 }

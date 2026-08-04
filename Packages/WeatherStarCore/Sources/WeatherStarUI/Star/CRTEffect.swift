@@ -120,6 +120,11 @@ private struct CRTModifier: ViewModifier {
                 .truncatingRemainder(dividingBy: CRTEffect.timeWrap)
 
             content
+                // Pinned to exactly the size handed to the shader. Without this the layer
+                // is sized by its children, and the shader's `position / size` no longer
+                // spans 0...1 — which on a real Apple TV put every pixel outside the glass
+                // and blacked out the screen while the simulator looked correct.
+                .frame(width: size.width, height: size.height)
                 .layerEffect(
                     ShaderLibrary.default.starCRT(
                         .float2(size.width, size.height),
