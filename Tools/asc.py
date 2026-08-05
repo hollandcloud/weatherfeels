@@ -12,13 +12,17 @@ Then:
     Tools/asc.py status                   # what ASC currently has. Run this first.
     Tools/asc.py text                     # name, subtitle, description, keywords, URLs
     Tools/asc.py screenshots              # upload Store/screenshots/<platform>/
+    Tools/asc.py review                   # App Review contact details and notes
+    Tools/asc.py agerating                # the questionnaire, all answers "none"
     Tools/asc.py all
 
-`status` is read-only and is the only way to confirm two things this script cannot
-know on its own: whether the tvOS and macOS platforms exist on the app record yet, and
-what screenshot display types ASC wants for each of them. Two of the display-type
-constants below are educated guesses — Apple has renamed them before — so check them
-against `status` output before trusting `screenshots`.
+`status` is read-only; run it first and after anything else. It prints which platforms
+exist on the record and the `screenshotDisplayType` of every set, which is how the
+constants below were confirmed rather than assumed.
+
+`text` will happily overwrite a name or subtitle edited in the browser, because the
+files under Store/metadata are the source of truth. If someone has changed either in
+App Store Connect, copy it back into the .txt first — `status` shows the current value.
 """
 
 from __future__ import annotations
@@ -26,6 +30,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -100,8 +105,28 @@ def token() -> str:
 JWT = None
 
 
+class ASCError(Exception):
+    """An HTTP error from ASC, with the body kept so a caller can act on it."""
+
+    def __init__(self, status: int, body: str):
+        super().__init__(f"HTTP {status}: {body}")
+        self.status = status
+        self.body = body
+
+    def uneditable_attribute(self) -> str | None:
+        """The attribute ASC refused, if it refused one.
+
+        A first version has no "What's New" — it is only meaningful on an update — and
+        ASC reports that as a 409 naming the attribute rather than ignoring it. Reading
+        the name back out lets the caller drop that one field and keep the rest, instead
+        of the whole listing failing on a field that was never going to apply.
+        """
+        match = re.search(r"Attribute '(\w+)' cannot be edited", self.body)
+        return match.group(1) if match else None
+
+
 def call(method: str, path: str, body: dict | None = None, raw: bytes | None = None,
-         headers: dict | None = None) -> dict:
+         headers: dict | None = None, tolerate: bool = False) -> dict:
     global JWT
     if JWT is None:
         JWT = token()
@@ -109,7 +134,13 @@ def call(method: str, path: str, body: dict | None = None, raw: bytes | None = N
     url = path if path.startswith("http") else API + path
     data = raw if raw is not None else (json.dumps(body).encode() if body else None)
     request = urllib.request.Request(url, data=data, method=method)
-    request.add_header("Authorization", f"Bearer {JWT}")
+
+    # The bearer token goes to the API and nowhere else. Screenshot bytes are PUT to
+    # Apple's object storage on a presigned URL whose signature covers `host` alone, so an
+    # extra Authorization header makes it a different request than the one that was signed
+    # and the upload comes back 400 "Invalid request".
+    if url.startswith(API):
+        request.add_header("Authorization", f"Bearer {JWT}")
     if raw is None and data:
         request.add_header("Content-Type", "application/json")
     for name, value in (headers or {}).items():
@@ -121,6 +152,8 @@ def call(method: str, path: str, body: dict | None = None, raw: bytes | None = N
             return json.loads(payload) if payload else {}
     except urllib.error.HTTPError as error:
         detail = error.read().decode(errors="replace")
+        if tolerate:
+            raise ASCError(error.code, detail) from None
         # ASC's errors are specific and worth showing verbatim — they name the field.
         sys.exit(f"{method} {url}\n  HTTP {error.code}\n  {detail}")
 
@@ -260,18 +293,175 @@ def push_text() -> None:
                 "marketingUrl": read("marketing_url"),
             }
             attributes = {k: v for k, v in attributes.items() if v}
+
+            # Retried with the offending field removed rather than failing outright: on a
+            # first version ASC refuses `whatsNew`, and losing the description over a
+            # release note that cannot exist yet would be a poor trade.
+            dropped = []
+            while attributes:
+                try:
+                    call(
+                        "PATCH",
+                        f"/v1/appStoreVersionLocalizations/{localization['id']}",
+                        {
+                            "data": {
+                                "type": "appStoreVersionLocalizations",
+                                "id": localization["id"],
+                                "attributes": attributes,
+                            }
+                        },
+                        tolerate=True,
+                    )
+                    break
+                except ASCError as error:
+                    name = error.uneditable_attribute()
+                    if name is None or name not in attributes:
+                        sys.exit(f"  {platform}: {error}")
+                    del attributes[name]
+                    dropped.append(name)
+
+            note = f"  (not editable yet: {', '.join(dropped)})" if dropped else ""
+            print(f"  {platform}: {', '.join(attributes)}{note}")
+
+
+def reviewer_notes() -> str | None:
+    """The reviewer-facing block out of `review-notes.md`.
+
+    Taken from between the first pair of `---` fences in that file, so the prose and the
+    table around it stay readable as documentation while the part a reviewer actually
+    sees has exactly one home.
+    """
+    path = STORE / "metadata" / "review-notes.md"
+    if not path.exists():
+        return None
+    parts = path.read_text().split("\n---\n")
+    return parts[1].strip() if len(parts) > 2 else None
+
+
+def push_review() -> None:
+    """App Review Information: who to contact, and what to tell them."""
+    contact = {
+        "contactFirstName": "Kevin",
+        "contactLastName": "Holland",
+        "contactPhone": "844-247-4274",
+        "contactEmail": "hollandkevin@icloud.com",
+        "demoAccountRequired": False,
+    }
+    notes = reviewer_notes()
+    if notes:
+        contact["notes"] = notes
+
+    for platform, version_id in editable_versions().items():
+        existing = call(
+            "GET", f"/v1/appStoreVersions/{version_id}/appStoreReviewDetail"
+        ).get("data")
+
+        if existing:
             call(
                 "PATCH",
-                f"/v1/appStoreVersionLocalizations/{localization['id']}",
+                f"/v1/appStoreReviewDetails/{existing['id']}",
                 {
                     "data": {
-                        "type": "appStoreVersionLocalizations",
-                        "id": localization["id"],
-                        "attributes": attributes,
+                        "type": "appStoreReviewDetails",
+                        "id": existing["id"],
+                        "attributes": contact,
                     }
                 },
             )
-            print(f"  {platform}: {', '.join(attributes)}")
+        else:
+            call(
+                "POST",
+                "/v1/appStoreReviewDetails",
+                {
+                    "data": {
+                        "type": "appStoreReviewDetails",
+                        "attributes": contact,
+                        "relationships": {
+                            "appStoreVersion": {
+                                "data": {"type": "appStoreVersions", "id": version_id}
+                            }
+                        },
+                    }
+                },
+            )
+        print(f"  {platform}: contact set{', notes ' + str(len(notes)) + ' chars' if notes else ''}")
+
+
+def push_age_rating() -> None:
+    """The age-rating questionnaire: every content answer is "none"."""
+    # Field names and types as the API spells them. Frequency questions take an enum,
+    # does-it-contain questions take a boolean, and the API is strict about which is
+    # which — sending "NONE" for a boolean is a 409, not a coercion. The newer half of
+    # this list (advertising through userGeneratedContent) is required now and was not
+    # when this was first written, so the types were read back off the API's own
+    # complaints rather than guessed.
+    answers = {
+        # Frequency: NONE | INFREQUENT_OR_MILD | FREQUENT_OR_INTENSE
+        "alcoholTobaccoOrDrugUseOrReferences": "NONE",
+        "contests": "NONE",
+        "gamblingSimulated": "NONE",
+        "gunsOrOtherWeapons": "NONE",
+        "horrorOrFearThemes": "NONE",
+        "matureOrSuggestiveThemes": "NONE",
+        "medicalOrTreatmentInformation": "NONE",
+        "profanityOrCrudeHumor": "NONE",
+        "sexualContentGraphicAndNudity": "NONE",
+        "sexualContentOrNudity": "NONE",
+        "violenceCartoonOrFantasy": "NONE",
+        "violenceRealistic": "NONE",
+        "violenceRealisticProlongedGraphicOrSadistic": "NONE",
+        # Presence: all false. No advertising, no chat, nothing user-submitted, no
+        # in-app purchases of any kind, and nothing that needs an age check.
+        "advertising": False,
+        "ageAssurance": False,
+        "gambling": False,
+        "healthOrWellnessTopics": False,
+        "lootBox": False,
+        "messagingAndChat": False,
+        "parentalControls": False,
+        "socialMedia": False,
+        "unrestrictedWebAccess": False,
+        "userGeneratedContent": False,
+    }
+
+    for info in call("GET", f"/v1/apps/{app_id()}/appInfos")["data"]:
+        declaration = call(
+            "GET", f"/v1/appInfos/{info['id']}/ageRatingDeclaration"
+        ).get("data")
+        if not declaration:
+            print(f"  appInfo {info['id']}: no age rating declaration")
+            continue
+
+        remaining = dict(answers)
+        dropped = []
+        while remaining:
+            try:
+                call(
+                    "PATCH",
+                    f"/v1/ageRatingDeclarations/{declaration['id']}",
+                    {
+                        "data": {
+                            "type": "ageRatingDeclarations",
+                            "id": declaration["id"],
+                            "attributes": remaining,
+                        }
+                    },
+                    tolerate=True,
+                )
+                break
+            except ASCError as error:
+                # Apple renames these occasionally; drop what it rejects by name and keep
+                # the rest rather than losing the whole questionnaire to one stale key.
+                bad = re.findall(r"'?/?data/attributes/(\w+)", error.body)
+                bad = [name for name in bad if name in remaining]
+                if not bad:
+                    sys.exit(f"  age rating: {error}")
+                for name in bad:
+                    del remaining[name]
+                    dropped.append(name)
+
+        note = f"  (rejected: {', '.join(dropped)})" if dropped else ""
+        print(f"  appInfo {info['id']}: {len(remaining)} answers set{note}")
 
 
 def upload_one(set_id: str, image: Path) -> None:
@@ -399,9 +589,15 @@ def main() -> None:
         push_text()
     elif command == "screenshots":
         push_screenshots()
+    elif command == "review":
+        push_review()
+    elif command == "agerating":
+        push_age_rating()
     elif command == "all":
         push_text()
         push_screenshots()
+        push_review()
+        push_age_rating()
     else:
         sys.exit(__doc__)
 
