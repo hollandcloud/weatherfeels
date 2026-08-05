@@ -1,4 +1,5 @@
-# WeatherStar 4000+ for Apple platforms
+# WeatherFeels
+## a WeatherStar 4000+ port for Apple platforms
 
 A native SwiftUI recreation of [netbymatt/ws4kp](https://github.com/netbymatt/ws4kp) —
 The Weather Channel's WeatherStar 4000 local forecast unit — running on **tvOS,
