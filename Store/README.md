@@ -39,10 +39,14 @@ display, which means it is in all 23 screenshots. An icon reading WEATHER STAR 4
 under a name chosen to avoid it defeats the point of the rename, and the icon is the most
 visible surface there is: search results, product page, and the device itself.
 
-`Tools/MakeIcons.swift` draws the badge from three lines of text, so regenerating it for
-every platform is a small change. The corner logo needs a new image added to each app's
-asset catalog with `WS4KLogoImageName` pointed at it, and then the screenshots want
-re-shooting. **Not done — waiting on a decision about what the badge should say.**
+**Decided: the badge stays as it is.** Kevin's call, made with the trade-off in front of
+him. So the position going into review is a name that avoids the mark, a description that
+never uses it except to disclaim, and artwork that still shows it. If that draws a
+5.2.1 rejection or a complaint later, the badge is the thing to change, and it is not
+much work: `Tools/MakeIcons.swift` draws it from three lines of text, the corner logo
+already has the `WS4KLogoImageName` hook, and the screenshot harness can re-shoot the set
+in about twenty minutes. A generated `WS4KP / NOSTALGIA` alternative has been rendered and
+checked once already, so that route is proven if it is ever wanted.
 
 Being free and open source helps the underlying position considerably: it puts this in
 the same posture as `ws4kp` itself, whose defence is that it is "a free, non-profit work
