@@ -118,7 +118,7 @@ public struct SettingsView: View {
             }
 
             Picker("Screen effect", selection: bind(\.screenEffect)) {
-                ForEach(ScreenEffect.availableCases, id: \.self) { effect in
+                ForEach(offeredScreenEffects, id: \.self) { effect in
                     Text(effect.displayName).tag(effect)
                 }
             }
@@ -159,6 +159,12 @@ public struct SettingsView: View {
                 }
             }
         }
+    }
+
+    /// `.tube` needs a GPU that can actually run a SwiftUI shader; the other two always
+    /// work, because `.animated` falls back to the drawn overlay.
+    private var offeredScreenEffects: [ScreenEffect] {
+        ScreenEffect.allCases.filter { $0 != .tube || CRTEffect.isAvailable }
     }
 
     // MARK: - Rotation

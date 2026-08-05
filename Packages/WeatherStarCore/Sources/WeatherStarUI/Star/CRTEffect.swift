@@ -1,3 +1,4 @@
+import Metal
 import SwiftUI
 import WeatherStarKit
 
@@ -18,8 +19,26 @@ public enum CRTEffect {
     /// Checked by looking for the metallib rather than by trying the shader and recovering:
     /// there is no recovering from a missing shader function.
     public static let isAvailable: Bool = {
-        Bundle.main.url(forResource: "default", withExtension: "metallib") != nil
+        guard Bundle.main.url(forResource: "default", withExtension: "metallib") != nil
+        else { return false }
+        return hasCapableGPU
     }()
+
+    /// Whether this GPU is new enough for SwiftUI's shader effects to actually work.
+    ///
+    /// The API exists on every platform the app supports, and the code compiles and runs
+    /// without complaint on older hardware — it simply renders black. An Apple TV HD
+    /// (AppleTV5,3, A8, 2015) does exactly that, for the trivial `colorEffect` as readily as
+    /// for the tube, while an Apple TV 4K is expected to be fine.
+    ///
+    /// `.metal3` is the bar because it is a documented, meaningful line rather than a guess
+    /// at a specific chip: A13/M1 and later. If a device that would have worked is refused
+    /// by this, lowering it to `.apple4` is the next thing to try — but a mode that blanks
+    /// the screen is far worse than a mode that is absent, so this errs strict.
+    private static var hasCapableGPU: Bool {
+        guard let device = MTLCreateSystemDefaultDevice() else { return false }
+        return device.supportsFamily(.metal3)
+    }
 
     /// How far the shader reads outside the pixel it is writing.
     ///
