@@ -287,7 +287,10 @@ public final class WeatherStore {
             dewpoint: "\(units.temperature(observation.dewpoint?.value))\(degreeSign)",
             ceiling: ceiling,
             visibility: units.visibility.withUnits(observation.visibility?.value),
-            pressure: "\(units.pressure(observation.barometricPressure?.value))\(units.pressure.units) \(trend)",
+            // Trimmed because `trend` is empty unless the barometer is moving, and the
+            // trailing space it left behind showed up in the ticker.
+            pressure: "\(units.pressure(observation.barometricPressure?.value))\(units.pressure.units) \(trend)"
+                .trimmingCharacters(in: .whitespaces),
             apparentLabel: apparentLabel,
             apparentValue: apparentValue,
             observedAt: observation.timestamp,
@@ -840,33 +843,43 @@ public final class WeatherStore {
     // MARK: - Scroll ticker
 
     private func buildScroll(_ parameters: WeatherParameters) {
+        scroll = ScrollContent(
+            header: parameters.cityName,
+            lines: Self.scrollLines(from: currentConditions),
+            hazardHeadline: hazards.first.map { "\($0.event.uppercased()) - \($0.detail)" }
+        )
+    }
+
+    /// The ticker's rotating readings, built from the already-formatted conditions.
+    ///
+    /// Pulled out of `buildScroll` as a pure function so it can be tested: every value
+    /// here arrives with its unit already attached, which is easy to forget — appending
+    /// the unit a second time is what put "Pressure: 30.09 in.hg  in.hg" on screen.
+    /// `nonisolated` because it touches no store state — the whole point is that it is a
+    /// function of its argument, callable from a test without a main-actor hop.
+    nonisolated static func scrollLines(from current: CurrentConditionsData?) -> [String] {
+        guard let current else { return [] }
         var lines: [String] = []
 
         // Each line has to fit the ticker's ~530pt text area at 32pt, which is about
         // 34 characters. Pairing two measurements per line overflowed it, so keep the
         // pairs short and give the wordier readings a line of their own.
-        if let current = currentConditions {
-            lines.append("Conditions at \(current.locationName)")
-            lines.append("Temp: \(current.temperature)   Wind: \(current.wind)")
-            if let gust = current.windGust {
-                lines.append(gust)
-            }
-            lines.append("Humidity: \(current.humidity)   Dewpoint: \(current.dewpoint)")
-            if !current.pressure.hasPrefix("-") {
-                lines.append("Pressure: \(current.pressure)\(converters.pressure.units)")
-            }
-            lines.append("Visibility: \(current.visibility)")
-            lines.append("Ceiling: \(current.ceiling)")
-            if let apparentLabel = current.apparentLabel, let apparentValue = current.apparentValue {
-                lines.append("\(apparentLabel) \(apparentValue)")
-            }
+        lines.append("Conditions at \(current.locationName)")
+        lines.append("Temp: \(current.temperature)   Wind: \(current.wind)")
+        if let gust = current.windGust {
+            lines.append(gust)
         }
-
-        scroll = ScrollContent(
-            header: parameters.cityName,
-            lines: lines,
-            hazardHeadline: hazards.first.map { "\($0.event.uppercased()) - \($0.detail)" }
-        )
+        lines.append("Humidity: \(current.humidity)   Dewpoint: \(current.dewpoint)")
+        // A station with no barometer formats as "-", which is not worth a line.
+        if !current.pressure.hasPrefix("-") {
+            lines.append("Pressure: \(current.pressure)")
+        }
+        lines.append("Visibility: \(current.visibility)")
+        lines.append("Ceiling: \(current.ceiling)")
+        if let apparentLabel = current.apparentLabel, let apparentValue = current.apparentValue {
+            lines.append("\(apparentLabel) \(apparentValue)")
+        }
+        return lines
     }
 
     // MARK: - Date formatting

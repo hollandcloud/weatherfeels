@@ -231,4 +231,111 @@ struct DisplaySnapshotTests {
         #expect(image.width == 3840)
     }
 }
+
+/// The column titles on the two scrolling tables have to stay put while the rows move.
+///
+/// This came out of a store screenshot: every frame of the Hourly display had
+/// "TEMP LIKE WIND" sitting on top of a row of numbers, because the rows were drawn
+/// after the header in the same `ZStack` and slid out over it.
+@Suite("Scrolling table headers")
+@MainActor
+struct TableHeaderTests {
+    private var metrics: StarMetrics {
+        StarMetrics(space: .wide, container: CGSize(width: 3840, height: 2160))
+    }
+
+    private func rows(_ count: Int) -> [HourlyRow] {
+        (0..<count).map { index in
+            HourlyRow(
+                time: Date(timeIntervalSince1970: 1_770_000_000 + Double(index) * 3600),
+                hourLabel: "\((index % 12) + 1) PM",
+                icon: IconMapper.smallIcon(for: "/icons/land/day/few"),
+                temperature: "8\(index % 10)",
+                apparent: "9\(index % 10)",
+                wind: "NNW 15",
+                isHeatIndex: true,
+                isWindChill: false
+            )
+        }
+    }
+
+    private func render(_ offset: Double) -> CGImage? {
+        StarFontLoader.registerFonts()
+        let m = metrics
+        let renderer = ImageRenderer(
+            content: HourlyDisplay(rows: rows(24), scrollOffset: offset)
+                .environment(\.starMetrics, m)
+                .environment(\.starContentWidth, 640)
+                // Top-leading, not the default centre: the display is shorter than the
+                // full canvas, and centring it moved the header band into the middle of
+                // the image, where sampling the top rows found only background.
+                .frame(
+                    width: m.scaledSize.width,
+                    height: m.scaledSize.height,
+                    alignment: .topLeading
+                )
+                .background(Color.black)
+        )
+        renderer.scale = 1
+        return renderer.cgImage
+    }
+
+    /// Pixels of the band and the title glyphs that hang below it.
+    private func headerPixels(_ image: CGImage) -> [UInt8] {
+        let height = Int((metrics.s(TableHeader.contentTop)).rounded(.up))
+        let width = image.width
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        pixels.withUnsafeMutableBytes { buffer in
+            let context = CGContext(
+                data: buffer.baseAddress, width: width, height: height,
+                bitsPerComponent: 8, bytesPerRow: width * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )!
+            // Draw the full image into a short context so only the top band lands in it.
+            context.draw(
+                image,
+                in: CGRect(
+                    x: 0, y: CGFloat(height) - CGFloat(image.height),
+                    width: CGFloat(width), height: CGFloat(image.height)
+                )
+            )
+        }
+        return pixels
+    }
+
+    @Test("Scrolling the rows leaves the header untouched")
+    func headerIsUnaffectedByScrolling() throws {
+        // Discarded: the first render in a process can land before Core Text has picked
+        // up the registered Star4000 faces, so its glyphs are missing and it is not a
+        // sound reference. Which render is first depends on the order the suites happen
+        // to run in, so without this the test passes or fails by luck.
+        _ = render(0)
+
+        // Offsets across a whole row's travel, including the point where a row's text
+        // would previously have landed exactly on the titles.
+        let atRest = try #require(render(0))
+        let reference = headerPixels(atRest)
+
+        for offset in [8.0, 20.0, 36.0, 72.0, 144.0] {
+            let scrolled = try #require(render(offset))
+            // Compared through a Bool on purpose: handing the arrays themselves to
+            // `#expect` puts ~28MB of pixel values in the failure message.
+            let unchanged = headerPixels(scrolled) == reference
+            #expect(unchanged, "the header changed once the rows moved to \(offset)")
+        }
+    }
+
+    @Test("The header band is actually drawn, so the comparison means something")
+    func headerIsNotBlank() throws {
+        // Guards the test above: comparing two empty bands would pass for the wrong
+        // reason, so require the band to differ from the plain background.
+        let image = try #require(render(0))
+        let pixels = headerPixels(image)
+        let distinct = Set(stride(from: 0, to: pixels.count, by: 4).map { index in
+            [pixels[index], pixels[index + 1], pixels[index + 2]]
+        })
+        #expect(distinct.count > 2, "header band has \(distinct.count) distinct colours")
+    }
+}
 #endif

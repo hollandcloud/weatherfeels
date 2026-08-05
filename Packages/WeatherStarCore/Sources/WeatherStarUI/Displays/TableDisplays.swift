@@ -133,6 +133,46 @@ struct LatestObservationsDisplay: View {
     }
 }
 
+/// Geometry shared by the two scrolling tables, whose column titles stay put while the
+/// rows travel underneath them.
+enum TableHeader {
+    /// The coloured strip behind the titles.
+    static let bandHeight: CGFloat = 20
+    /// Titles are hung above the band's top edge so they sit *on* the strip.
+    static let textY: CGFloat = -8
+
+    /// Where the scrolling rows may begin — below the band, not level with it.
+    ///
+    /// The titles are 32pt type hung at `textY`, so their glyphs descend past the band's
+    /// bottom edge. The rows used to be drawn after the header in the same `ZStack`,
+    /// which put a scrolling row *over* the titles: every frame of the Hourly display
+    /// had "TEMP LIKE WIND" tangled up in a row of numbers, which is how it was caught,
+    /// in a store screenshot. Clipping the rows to start here means no row pixel can
+    /// reach the titles whatever order the two draw in.
+    static let contentTop: CGFloat = 28
+
+    /// The scrolling half of a table: content that slides up behind a fixed header.
+    @MainActor
+    static func scrolling<Content: View>(
+        viewportHeight: CGFloat,
+        width: CGFloat,
+        scrollOffset: Double,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        content()
+            // Inside the clip box, so the rows still line up with the band the way they
+            // did before the box existed.
+            .designOffset(y: bandHeight - contentTop - scrollOffset)
+            .designFrame(
+                width: width,
+                height: viewportHeight - contentTop,
+                alignment: .topLeading
+            )
+            .clipped()
+            .designOffset(y: contentTop)
+    }
+}
+
 /// Hourly Forecast: a scrolling table of the next 24 hours. Columns from
 /// `_hourly.scss`.
 struct HourlyDisplay: View {
@@ -165,14 +205,14 @@ struct HourlyDisplay: View {
         ZStack(alignment: .topLeading) {
             // Header band sits above the scrolling area and does not move.
             StarColor.columnHeaderBackground
-                .designFrame(width: contentWidth, height: 20)
+                .designFrame(width: contentWidth, height: TableHeader.bandHeight)
 
             StarText("TEMP", font: .small, size: 32, color: StarColor.columnHeaderText)
-                .designPosition(x: Column.temperature, y: -8)
+                .designPosition(x: Column.temperature, y: TableHeader.textY)
             StarText("LIKE", font: .small, size: 32, color: StarColor.columnHeaderText)
-                .designPosition(x: 435, y: -8)
+                .designPosition(x: 435, y: TableHeader.textY)
             StarText("WIND", font: .small, size: 32, color: StarColor.columnHeaderText)
-                .designPosition(x: 535, y: -8)
+                .designPosition(x: 535, y: TableHeader.textY)
 
             // Rasterised once, then translated. Scrolling changes only the offset, but
             // these rows are ~24 × 4 labels and `StarText` is six Core Text passes each —
@@ -185,10 +225,15 @@ struct HourlyDisplay: View {
             // and the drawing group re-rasterises content it cannot tell is identical.
             // Comparing the rows lets SwiftUI skip the rebuild entirely, so the raster
             // survives and scrolling is just a transform on it.
-            rowsView
-                .equatable()
-                .drawingGroup()
-                .designOffset(y: 20 - scrollOffset)
+            TableHeader.scrolling(
+                viewportHeight: viewportHeight,
+                width: contentWidth,
+                scrollOffset: scrollOffset
+            ) {
+                rowsView
+                    .equatable()
+                    .drawingGroup()
+            }
         }
         .designFrame(width: contentWidth, height: viewportHeight, alignment: .topLeading)
         .clipped()
@@ -231,15 +276,15 @@ struct TravelDisplay: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             StarColor.columnHeaderBackground
-                .designFrame(width: contentWidth, height: 20)
+                .designFrame(width: contentWidth, height: TableHeader.bandHeight)
 
             StarText("LOW", font: .small, size: 32, color: StarColor.columnHeaderText, alignment: .center)
                 .designFrame(width: Column.temperatureWidth, alignment: .center)
-                .designPosition(x: Column.low, y: -8)
+                .designPosition(x: Column.low, y: TableHeader.textY)
 
             StarText("HIGH", font: .small, size: 32, color: StarColor.columnHeaderText, alignment: .center)
                 .designFrame(width: Column.highWidth, alignment: .center)
-                .designPosition(x: Column.high, y: -8)
+                .designPosition(x: Column.high, y: TableHeader.textY)
 
             // Rasterised once, then translated. Scrolling changes only the offset, but
             // these rows are ~24 × 4 labels and `StarText` is six Core Text passes each —
@@ -252,10 +297,15 @@ struct TravelDisplay: View {
             // and the drawing group re-rasterises content it cannot tell is identical.
             // Comparing the rows lets SwiftUI skip the rebuild entirely, so the raster
             // survives and scrolling is just a transform on it.
-            rowsView
-                .equatable()
-                .drawingGroup()
-                .designOffset(y: 20 - scrollOffset)
+            TableHeader.scrolling(
+                viewportHeight: viewportHeight,
+                width: contentWidth,
+                scrollOffset: scrollOffset
+            ) {
+                rowsView
+                    .equatable()
+                    .drawingGroup()
+            }
         }
         .designFrame(width: contentWidth, height: viewportHeight, alignment: .topLeading)
         .clipped()

@@ -549,3 +549,79 @@ struct RadarFramingTests {
         }
     }
 }
+
+@Suite("Scroll ticker lines")
+struct ScrollTickerTests {
+    /// Values reach the ticker already formatted, units included. This mirrors what
+    /// `buildCurrentConditions` produces for a station reporting everything.
+    private func conditions(
+        pressure: String = "30.09 in.hg",
+        gust: String? = nil,
+        apparent: (String, String)? = nil
+    ) -> CurrentConditionsData {
+        CurrentConditionsData(
+            stationIdentifier: "KTPA",
+            locationName: "Tampa",
+            temperature: "86°",
+            condition: "Clear",
+            icon: WeatherIcon(fileName: "Sunny.gif", set: .currentConditions),
+            wind: "Calm",
+            windGust: gust,
+            humidity: "80%",
+            dewpoint: "79°",
+            ceiling: "Unlimited",
+            visibility: "9 mi.",
+            pressure: pressure,
+            apparentLabel: apparent?.0,
+            apparentValue: apparent?.1,
+            observedAt: nil,
+            isStale: false,
+            temperatureValue: 86
+        )
+    }
+
+    @Test("The pressure line carries its unit exactly once")
+    func pressureUnitIsNotDoubled() {
+        let line = try! #require(
+            WeatherStore.scrollLines(from: conditions())
+                .first { $0.hasPrefix("Pressure:") }
+        )
+        #expect(line == "Pressure: 30.09 in.hg")
+        // The original defect read "Pressure: 30.09 in.hg  in.hg" — the value already
+        // ends in its unit, and the ticker appended the unit again.
+        #expect(line.components(separatedBy: "in.hg").count - 1 == 1)
+        #expect(!line.contains("  "), "no run of spaces from an empty trend suffix")
+    }
+
+    @Test("A station with no barometer contributes no pressure line")
+    func pressureOmittedWhenMissing() {
+        let lines = WeatherStore.scrollLines(from: conditions(pressure: "-"))
+        #expect(!lines.contains { $0.hasPrefix("Pressure:") })
+    }
+
+    @Test("Optional readings appear only when present")
+    func optionalLines() {
+        let bare = WeatherStore.scrollLines(from: conditions())
+        #expect(!bare.contains { $0.hasPrefix("Heat Index") })
+
+        let full = WeatherStore.scrollLines(
+            from: conditions(gust: "Gusts to 22", apparent: ("Heat Index:", "100°"))
+        )
+        #expect(full.contains("Gusts to 22"))
+        #expect(full.contains("Heat Index: 100°"))
+    }
+
+    @Test("No conditions yields no lines rather than a header with nothing under it")
+    func emptyWithoutConditions() {
+        #expect(WeatherStore.scrollLines(from: nil).isEmpty)
+    }
+
+    /// The ticker viewport is about 34 characters at the design size; anything much
+    /// longer scrolls, which is fine, but a *pair* on one line should still fit.
+    @Test("Paired readings stay inside the ticker width")
+    func pairedLinesFit() {
+        for line in WeatherStore.scrollLines(from: conditions()) where line.contains("   ") {
+            #expect(line.count <= 34, "\(line) is \(line.count) characters")
+        }
+    }
+}
