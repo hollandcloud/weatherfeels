@@ -47,8 +47,8 @@ project netbymatt/ws4kp (MIT licence).
 | Sign-in required | No |
 | Demo account | not applicable |
 | Contact first / last name | Kevin Holland |
-| Contact phone | **still needed** — a required field; App Store Connect will not accept it blank |
-| Contact email | kholland@centrixiq.com |
+| Contact phone | 844-247-4274 |
+| Contact email | hollandkevin@icloud.com |
 | Notes | the block above |
 | Attachment | none needed |
 | Age rating | 4+ — see `age-rating.md` |

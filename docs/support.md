@@ -13,7 +13,7 @@ It helps to include:
 - The city you had selected
 - What you expected instead
 
-If you would rather not use GitHub, email **kholland@centrixiq.com**.
+If you would rather not use GitHub, email **hollandkevin@icloud.com**.
 
 ## Things that are expected behaviour
 

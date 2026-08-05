@@ -33,7 +33,22 @@ docs/
 
 ## Before you submit
 
-**1. The name.** Recommendation: **rename before submitting.** What the research found:
+**1. The artwork still carries the mark.** The name is settled — "ws4kp nostalgia" — but
+the app icon *is* the WEATHER STAR 4000+ badge, and so is the corner logo on every
+display, which means it is in all 23 screenshots. An icon reading WEATHER STAR 4000+
+under a name chosen to avoid it defeats the point of the rename, and the icon is the most
+visible surface there is: search results, product page, and the device itself.
+
+`Tools/MakeIcons.swift` draws the badge from three lines of text, so regenerating it for
+every platform is a small change. The corner logo needs a new image added to each app's
+asset catalog with `WS4KLogoImageName` pointed at it, and then the screenshots want
+re-shooting. **Not done — waiting on a decision about what the badge should say.**
+
+Being free and open source helps the underlying position considerably: it puts this in
+the same posture as `ws4kp` itself, whose defence is that it is "a free, non-profit work
+by fans". That was the one thing a paid listing could not claim.
+
+**Why the rename was recommended.** What the research found:
 
 - **No USPTO registration for "WeatherStar" in TWC's name turned up.** The only live
   `WEATHER STAR` registration found belongs to Larson Manufacturing, for doors and
@@ -93,10 +108,16 @@ rest of the sentence is accurate and worth keeping.
 | `ASC_ISSUER_ID` | Not on this machine. Users and Access → Integrations → App Store Connect API. Two keys are already in `~/.appstoreconnect/private_keys/` (`LFCSNDNP56`, `RJ5D99L9C9`) — say which one, or make a fresh App Manager key. |
 | tvOS and macOS platforms | The app record only has iOS. They must be added in App Store Connect by hand (App Store tab → **+** beside "iOS App"); there is no API for it. Until then those uploads are rejected with "no suitable application records were found". |
 | Review contact phone | **Still outstanding.** App Store Connect will not take a blank phone number in App Review Information — it is a required field rather than one that can be skipped. A free Google Voice number does the job, or use a company line. It is only ever used if a reviewer needs to reach you. |
-| Price | `description.txt` says "One purchase covers Apple TV, iPhone, iPad and Mac", which assumes the app is paid. If it is going out free, that line needs correcting before it ships. |
 
 Settled since the first draft:
 
+- **Free, no in-app purchases, no subscription.** The description says so, and it matters
+  for more than the pricing page — see the name section above.
+- **Name** — "ws4kp nostalgia". Applied to `name.txt`, the description, and
+  `CFBundleDisplayName` on all three platforms; the startup screen now reads "ws4kp /
+  nostalgia" via `WS4KStartupTitle`. The two usage strings no longer name the app at all,
+  since they read fine as "This app uses your location…".
+- **Contact** — hollandkevin@icloud.com, phone 844-247-4274.
 - **Age rating** — everything answered "None", which produces 4+. Recorded in
   `metadata/age-rating.md`; the questionnaire itself still has to be clicked through in
   the browser, there is no API for it.

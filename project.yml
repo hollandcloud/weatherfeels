@@ -60,10 +60,10 @@ settings:
     #   WS4KStartupSubtitle startup screen, second line (default "4000+";
     #                       set to an empty string for a single-line title)
     #
-    # INFOPLIST_KEY_ prefixed settings are copied into Info.plist by Xcode.
-    # INFOPLIST_KEY_WS4KLogoImageName: MyCornerLogo
-    # INFOPLIST_KEY_WS4KStartupTitle: My Weather
-    # INFOPLIST_KEY_WS4KStartupSubtitle: Channel
+    # Set these in Apps/<platform>/Info.plist, not here. `INFOPLIST_KEY_` prefixed
+    # build settings only reach the bundle when Xcode *generates* the Info.plist, and
+    # these targets each use an explicit one — set that way the keys are silently
+    # dropped, and the build looks like it worked.
     # Uncomment to enable private iCloud music sync. Also requires an iCloud
     # container in the target entitlements — see README.md.
     # SWIFT_ACTIVE_COMPILATION_CONDITIONS: WS4K_CLOUDKIT
