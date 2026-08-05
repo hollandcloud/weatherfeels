@@ -35,9 +35,24 @@ public enum CRTEffect {
     /// at a specific chip: A13/M1 and later. If a device that would have worked is refused
     /// by this, lowering it to `.apple4` is the next thing to try — but a mode that blanks
     /// the screen is far worse than a mode that is absent, so this errs strict.
+    ///
+    /// It does mean the effect is offered on every current iPhone and iPad as well as an
+    /// Apple TV 4K, and withheld on an Apple TV 4K of the first two generations (A10X and
+    /// A12) even though those are untested and may well have coped. The two devices this
+    /// has actually been run on are an A8, which renders black, and an A15, which is
+    /// correct.
     private static var hasCapableGPU: Bool {
+        // Every simulator's paravirtual GPU answers `false` to *all* of these — apple3,
+        // apple4, metal3, `supportsFunctionPointers`, the lot — while happily rendering
+        // the shader, because the work lands on the host Mac's GPU. So a family check
+        // there is not a capability answer, it is a missing answer, and taking it at face
+        // value withheld the effect from every simulator.
+        #if targetEnvironment(simulator)
+        return true
+        #else
         guard let device = MTLCreateSystemDefaultDevice() else { return false }
         return device.supportsFamily(.metal3)
+        #endif
     }
 
     /// How far the shader reads outside the pixel it is writing.

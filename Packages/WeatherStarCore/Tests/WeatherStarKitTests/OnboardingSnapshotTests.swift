@@ -121,6 +121,13 @@ struct OnboardingSnapshotTests {
     /// Mirrors `RootView.settingsScreen`: the panel is composited over a live display,
     /// so the backdrop has to be opaque enough for the options to read. A material
     /// alone resolved light on tvOS while the text stayed light, making it invisible.
+    ///
+    /// The one deliberate difference from production is how dark is asked for. Production
+    /// uses `.preferredColorScheme(.dark)`, which sets the presentation's actual
+    /// appearance so the platform's own chrome matches; there is no presentation here, and
+    /// `ImageRenderer` ignores the modifier, so the environment value stands in for it.
+    /// That makes this a test of the backdrop's contrast, not of the appearance plumbing —
+    /// which only a running app can show.
     @Test("The settings panel is readable over a running display")
     func settingsPanelContrast() throws {
         let store = settings {

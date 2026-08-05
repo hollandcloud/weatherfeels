@@ -184,6 +184,14 @@ public struct RootView: View {
             )
             .ignoresSafeArea()
 
+            // tvOS has no sheet dismiss affordance and Menu does not close a
+            // `fullScreenCover`, so the way out is a row inside the Form. It used to be a
+            // button floated over the top-trailing corner, which worked on the root page
+            // but not on a picker's option list: there the rows start at the very top, so
+            // it landed on the first one — and the first row is the focused one. A focused
+            // tvOS row is white, and the button's own background is a material, so it
+            // sampled that white row and went white too. The result was white "Close" on
+            // white, which is unreadable.
             SettingsView { location in
                 store.load(location: location)
             }
@@ -192,17 +200,17 @@ public struct RootView: View {
             .environment(musicLibrary)
             .environment(transfer)
             .environment(musicPlayer)
-            #if os(tvOS)
-            // tvOS has no sheet dismiss affordance, so add an explicit way out.
-            .overlay(alignment: .topTrailing) {
-                Button("Close") { isShowingSettings = false }
-                    .padding(40)
-            }
-            #endif
         }
-        // Pinned dark: the panel's base is dark regardless of the system appearance, so
-        // the text has to resolve light or it disappears.
-        .environment(\.colorScheme, .dark)
+        // Pinned dark at the *presentation* level rather than by overriding
+        // `EnvironmentValues.colorScheme`.
+        //
+        // The panel's base is a dark gradient whatever the system appearance is, so the
+        // text has to resolve light. Setting the environment value alone only tells
+        // SwiftUI's own drawing: the platform still derives its chrome — a Form's row
+        // fills, a focus highlight, an AppKit `Picker` menu — from the real UIKit/AppKit
+        // appearance. In light mode that gave light rows with white labels on them.
+        // `preferredColorScheme` sets the appearance itself, so the two agree.
+        .preferredColorScheme(.dark)
     }
 
     // MARK: - Startup

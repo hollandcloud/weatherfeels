@@ -23,6 +23,9 @@ public struct SettingsView: View {
     public var body: some View {
         NavigationStack {
             Form {
+                #if os(tvOS)
+                closeSection
+                #endif
                 locationSection
                 displaySection
                 rotationSection
@@ -44,6 +47,23 @@ public struct SettingsView: View {
             #endif
         }
     }
+
+    // MARK: - Close
+
+    #if os(tvOS)
+    /// The way out of Settings on tvOS, where there is no sheet chrome and Menu does not
+    /// dismiss a `fullScreenCover`.
+    ///
+    /// A row rather than a floating button, and first so it is reachable without scrolling:
+    /// anything floated over the list eventually lands on a focused row, which on tvOS is
+    /// white, and a white label on it cannot be read. Menu still pops back out of the
+    /// pushed pages, so this only has to exist here at the root.
+    private var closeSection: some View {
+        Section {
+            Button("Close Settings") { dismiss() }
+        }
+    }
+    #endif
 
     // MARK: - Location
 
