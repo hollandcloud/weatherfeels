@@ -170,6 +170,9 @@ struct LocalForecastDisplay: View {
             }
         }
         .designFrame(width: textWidth, alignment: .topLeading)
+        // Rasterised once so scrolling translates a layer instead of re-running Core Text
+        // over every wrapped paragraph. See the note in `TableDisplays`.
+        .drawingGroup()
         .designOffset(y: -scrollOffset)
         .designFrame(width: textWidth, height: Layout.viewportHeight, alignment: .topLeading)
         .clipped()

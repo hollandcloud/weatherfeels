@@ -174,7 +174,12 @@ struct HourlyDisplay: View {
             StarText("WIND", font: .small, size: 32, color: StarColor.columnHeaderText)
                 .designPosition(x: 535, y: -8)
 
+            // Rasterised once, then translated. Scrolling changes only the offset, but
+            // these rows are ~24 × 4 labels and `StarText` is six Core Text passes each —
+            // about 576 rasterisations — so re-rendering them per scroll step is what put
+            // Hourly Forecast at half a frame a second on an Apple TV HD.
             rowsView
+                .drawingGroup()
                 .designOffset(y: 20 - scrollOffset)
         }
         .designFrame(width: contentWidth, height: viewportHeight, alignment: .topLeading)
@@ -268,7 +273,12 @@ struct TravelDisplay: View {
                 .designFrame(width: Column.highWidth, alignment: .center)
                 .designPosition(x: Column.high, y: -8)
 
+            // Rasterised once, then translated. Scrolling changes only the offset, but
+            // these rows are ~24 × 4 labels and `StarText` is six Core Text passes each —
+            // about 576 rasterisations — so re-rendering them per scroll step is what put
+            // Hourly Forecast at half a frame a second on an Apple TV HD.
             rowsView
+                .drawingGroup()
                 .designOffset(y: 20 - scrollOffset)
         }
         .designFrame(width: contentWidth, height: viewportHeight, alignment: .topLeading)
