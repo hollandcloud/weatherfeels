@@ -143,7 +143,7 @@ struct HourlyDisplay: View {
     /// Vertical scroll offset in design points, driven by the engine's base count.
     let scrollOffset: Double
 
-    private enum Column {
+    fileprivate enum Column {
         static let hour: CGFloat = 25
         static let icon: CGFloat = 255
         static let temperature: CGFloat = 355
@@ -178,7 +178,15 @@ struct HourlyDisplay: View {
             // these rows are ~24 × 4 labels and `StarText` is six Core Text passes each —
             // about 576 rasterisations — so re-rendering them per scroll step is what put
             // Hourly Forecast at half a frame a second on an Apple TV HD.
+            // `.equatable()` is the part that makes the cache hold.
+            //
+            // `drawingGroup()` alone was not enough: `scrollOffset` is a property of this
+            // view, so changing it re-evaluates the body, rebuilds `rowsView` from scratch,
+            // and the drawing group re-rasterises content it cannot tell is identical.
+            // Comparing the rows lets SwiftUI skip the rebuild entirely, so the raster
+            // survives and scrolling is just a transform on it.
             rowsView
+                .equatable()
                 .drawingGroup()
                 .designOffset(y: 20 - scrollOffset)
         }
@@ -186,48 +194,8 @@ struct HourlyDisplay: View {
         .clipped()
     }
 
-    private var rowsView: some View {
-        ZStack(alignment: .topLeading) {
-            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                let y = CGFloat(index) * Column.rowHeight + 8
-
-                StarText(row.hourLabel, font: .large, size: 32, color: StarColor.title)
-                    .designPosition(x: Column.hour, y: y)
-
-                PixelImage(row.icon, width: Column.iconWidth)
-                    .designPosition(x: Column.icon, y: y - 6)
-
-                StarText(row.temperature, font: .large, size: 32, color: StarColor.title)
-                    .designPosition(x: Column.temperature, y: y)
-
-                StarText(
-                    row.apparent,
-                    font: .large,
-                    size: 32,
-                    color: row.isHeatIndex
-                        ? StarColor.heatIndex
-                        : (row.isWindChill ? StarColor.windChill : StarColor.title)
-                )
-                .designPosition(x: Column.apparent, y: y)
-
-                StarText(
-                    row.wind,
-                    font: .large,
-                    size: 32,
-                    color: StarColor.title,
-                    alignment: .trailing,
-                    lineLimit: 1,
-                    minimumScaleFactor: 0.8
-                )
-                .designFrame(width: Column.windWidth, alignment: .trailing)
-                .designPosition(x: Column.wind, y: y)
-            }
-        }
-        .designFrame(
-            width: contentWidth,
-            height: max(CGFloat(rows.count) * Column.rowHeight, 1),
-            alignment: .topLeading
-        )
+    private var rowsView: HourlyRowsView {
+        HourlyRowsView(rows: rows, contentWidth: contentWidth)
     }
 
     /// Total content height, so the parent can compute scroll timing.
@@ -246,7 +214,7 @@ struct TravelDisplay: View {
     let rows: [TravelRow]
     let scrollOffset: Double
 
-    private enum Column {
+    fileprivate enum Column {
         static let city: CGFloat = 80
         static let icon: CGFloat = 330
         static let low: CGFloat = 455
@@ -277,7 +245,15 @@ struct TravelDisplay: View {
             // these rows are ~24 × 4 labels and `StarText` is six Core Text passes each —
             // about 576 rasterisations — so re-rendering them per scroll step is what put
             // Hourly Forecast at half a frame a second on an Apple TV HD.
+            // `.equatable()` is the part that makes the cache hold.
+            //
+            // `drawingGroup()` alone was not enough: `scrollOffset` is a property of this
+            // view, so changing it re-evaluates the body, rebuilds `rowsView` from scratch,
+            // and the drawing group re-rasterises content it cannot tell is identical.
+            // Comparing the rows lets SwiftUI skip the rebuild entirely, so the raster
+            // survives and scrolling is just a transform on it.
             rowsView
+                .equatable()
                 .drawingGroup()
                 .designOffset(y: 20 - scrollOffset)
         }
@@ -285,10 +261,86 @@ struct TravelDisplay: View {
         .clipped()
     }
 
-    private var rowsView: some View {
+    private var rowsView: TravelRowsView {
+        TravelRowsView(rows: rows, contentWidth: contentWidth)
+    }
+
+    /// Total height of all rows, for the engine's scroll timing.
+    static func contentHeight(rowCount: Int) -> CGFloat {
+        CGFloat(rowCount) * Column.rowHeight + 20
+    }
+}
+
+
+/// The scrolling rows, split out as an `Equatable` view.
+///
+/// This exists purely so `.equatable()` has a named type to compare. Left as a computed
+/// property on the display, changing `scrollOffset` re-evaluated the body and rebuilt these
+/// rows, which defeated `drawingGroup()` — it cannot tell that freshly-built content is
+/// identical, so it re-rasterised ~576 Core Text passes on every scroll step.
+private struct HourlyRowsView: View, Equatable {
+    let rows: [HourlyRow]
+    let contentWidth: CGFloat
+
+    var body: some View {
         ZStack(alignment: .topLeading) {
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                let y = CGFloat(index) * Column.rowHeight + 8
+                let y = CGFloat(index) * HourlyDisplay.Column.rowHeight + 8
+
+                StarText(row.hourLabel, font: .large, size: 32, color: StarColor.title)
+                    .designPosition(x: HourlyDisplay.Column.hour, y: y)
+
+                PixelImage(row.icon, width: HourlyDisplay.Column.iconWidth)
+                    .designPosition(x: HourlyDisplay.Column.icon, y: y - 6)
+
+                StarText(row.temperature, font: .large, size: 32, color: StarColor.title)
+                    .designPosition(x: HourlyDisplay.Column.temperature, y: y)
+
+                StarText(
+                    row.apparent,
+                    font: .large,
+                    size: 32,
+                    color: row.isHeatIndex
+                        ? StarColor.heatIndex
+                        : (row.isWindChill ? StarColor.windChill : StarColor.title)
+                )
+                .designPosition(x: HourlyDisplay.Column.apparent, y: y)
+
+                StarText(
+                    row.wind,
+                    font: .large,
+                    size: 32,
+                    color: StarColor.title,
+                    alignment: .trailing,
+                    lineLimit: 1,
+                    minimumScaleFactor: 0.8
+                )
+                .designFrame(width: HourlyDisplay.Column.windWidth, alignment: .trailing)
+                .designPosition(x: HourlyDisplay.Column.wind, y: y)
+            }
+        }
+        .designFrame(
+            width: contentWidth,
+            height: max(CGFloat(rows.count) * HourlyDisplay.Column.rowHeight, 1),
+            alignment: .topLeading
+        )
+    }
+}
+
+/// The scrolling rows, split out as an `Equatable` view.
+///
+/// This exists purely so `.equatable()` has a named type to compare. Left as a computed
+/// property on the display, changing `scrollOffset` re-evaluated the body and rebuilt these
+/// rows, which defeated `drawingGroup()` — it cannot tell that freshly-built content is
+/// identical, so it re-rasterised ~576 Core Text passes on every scroll step.
+private struct TravelRowsView: View, Equatable {
+    let rows: [TravelRow]
+    let contentWidth: CGFloat
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                let y = CGFloat(index) * TravelDisplay.Column.rowHeight + 8
 
                 StarText(
                     row.city,
@@ -298,18 +350,18 @@ struct TravelDisplay: View {
                     lineLimit: 1,
                     minimumScaleFactor: 0.8
                 )
-                .designFrame(width: Column.icon - Column.city - 10, alignment: .leading)
+                .designFrame(width: TravelDisplay.Column.icon - TravelDisplay.Column.city - 10, alignment: .leading)
                 .clipped()
-                .designPosition(x: Column.city, y: y)
+                .designPosition(x: TravelDisplay.Column.city, y: y)
 
                 if let icon = row.icon {
-                    PixelImage(icon, width: Column.iconWidth)
-                        .designPosition(x: Column.icon, y: y - 6)
+                    PixelImage(icon, width: TravelDisplay.Column.iconWidth)
+                        .designPosition(x: TravelDisplay.Column.icon, y: y - 6)
                 }
 
                 StarText(row.low, font: .large, size: 32, color: StarColor.title, alignment: .center)
-                    .designFrame(width: Column.temperatureWidth, alignment: .center)
-                    .designPosition(x: Column.low, y: y)
+                    .designFrame(width: TravelDisplay.Column.temperatureWidth, alignment: .center)
+                    .designPosition(x: TravelDisplay.Column.low, y: y)
 
                 StarText(
                     row.high,
@@ -319,19 +371,14 @@ struct TravelDisplay: View {
                     alignment: .center,
                     lineLimit: 1
                 )
-                .designFrame(width: Column.highWidth, alignment: .center)
-                .designPosition(x: Column.high, y: y)
+                .designFrame(width: TravelDisplay.Column.highWidth, alignment: .center)
+                .designPosition(x: TravelDisplay.Column.high, y: y)
             }
         }
         .designFrame(
             width: contentWidth,
-            height: max(CGFloat(rows.count) * Column.rowHeight, 1),
+            height: max(CGFloat(rows.count) * TravelDisplay.Column.rowHeight, 1),
             alignment: .topLeading
         )
-    }
-
-    /// Total height of all rows, for the engine's scroll timing.
-    static func contentHeight(rowCount: Int) -> CGFloat {
-        CGFloat(rowCount) * Column.rowHeight + 20
     }
 }

@@ -70,7 +70,7 @@ public struct ObservationRow: Sendable, Identifiable {
 
 // MARK: - Hourly Forecast
 
-public struct HourlyRow: Sendable, Identifiable {
+public struct HourlyRow: Sendable, Identifiable, Equatable {
     public var id: Date { time }
     public var time: Date
     public var hourLabel: String
@@ -92,7 +92,7 @@ public struct HourlyRow: Sendable, Identifiable {
 
 // MARK: - Travel Forecast
 
-public struct TravelRow: Sendable, Identifiable {
+public struct TravelRow: Sendable, Identifiable, Equatable {
     public var id: String { city }
     public var city: String
     public var icon: WeatherIcon?
