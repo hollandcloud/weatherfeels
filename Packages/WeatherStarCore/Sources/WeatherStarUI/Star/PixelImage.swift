@@ -118,6 +118,7 @@ public struct PixelImage: View {
     private let designWidth: CGFloat?
 
     @Environment(\.starMetrics) private var metrics
+    @Environment(\.starAnimationClock) private var animationClock
     @State private var decoded: DecodedImage?
 
     public init(_ icon: WeatherIcon?, width: CGFloat? = nil, height: CGFloat? = nil) {
@@ -155,12 +156,15 @@ public struct PixelImage: View {
     }
 
     /// Drive GIF frames off a shared timeline so several icons stay in step.
+    ///
+    /// The comment above was the intent from the start, but each icon used to build its own
+    /// `TimelineView`. Hourly Forecast draws about two dozen animated icons, so that was two
+    /// dozen independent 20fps timers each forcing a full view-graph update — on an Apple TV
+    /// HD it wedged the main thread. One clock in the environment means one update per tick
+    /// however many icons are on screen.
     private func animated(_ decoded: DecodedImage) -> some View {
-        TimelineView(.animation(minimumInterval: 0.05, paused: false)) { timeline in
-            let elapsed = timeline.date.timeIntervalSinceReferenceDate
-            let index = decoded.frameIndex(at: elapsed)
-            render(decoded.frames[index].image, source: decoded.pixelSize)
-        }
+        let index = decoded.frameIndex(at: animationClock)
+        return render(decoded.frames[index].image, source: decoded.pixelSize)
     }
 
     private func render(_ image: CGImage, source: CGSize) -> some View {
@@ -186,6 +190,38 @@ public struct PixelImage: View {
         case (nil, nil):
             // Bundled art is authored at the design scale, so use its own size.
             return source
+        }
+    }
+}
+
+
+/// Shared time source for animated icons, so N icons cost one view-graph update per tick
+/// rather than N. Published by `IconAnimationClock`.
+private struct StarAnimationClockKey: EnvironmentKey {
+    static let defaultValue: Double = 0
+}
+
+extension EnvironmentValues {
+    var starAnimationClock: Double {
+        get { self[StarAnimationClockKey.self] }
+        set { self[StarAnimationClockKey.self] = newValue }
+    }
+}
+
+/// Publishes one animation clock to everything beneath it.
+struct IconAnimationClock<Content: View>: View {
+    /// 20fps, matching the frame rate the icons were decoded for.
+    private static var interval: Double { 0.05 }
+
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: Self.interval, paused: false)) { timeline in
+            content
+                .environment(
+                    \.starAnimationClock,
+                    timeline.date.timeIntervalSinceReferenceDate
+                )
         }
     }
 }

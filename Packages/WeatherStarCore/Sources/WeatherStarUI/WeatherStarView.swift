@@ -87,6 +87,13 @@ public struct WeatherStarView: View {
         return tube
     }
 
+    /// One sentence describing what is on screen, since the canvas is one element.
+    private var accessibilitySummary: String {
+        let place = settings.savedLocation?.name
+        let display = engine.activeDisplay?.name ?? "Loading"
+        return place.map { "\(display) for \($0)" } ?? display
+    }
+
     public init() {}
 
     public var body: some View {
@@ -107,8 +114,10 @@ public struct WeatherStarView: View {
                 // would slide the content out from under a fixed line pattern, which reads
                 // as the picture tearing rather than as a still image.
                 ZStack {
-                    canvas(metrics: metrics)
-                        .environment(\.starMetrics, metrics)
+                    IconAnimationClock {
+                        canvas(metrics: metrics)
+                            .environment(\.starMetrics, metrics)
+                    }
 
                     // Both shader paths draw their own lines, so the overlay would double
                     // them up — and for the tube it would curve one set and not the other,
@@ -122,6 +131,18 @@ public struct WeatherStarView: View {
                         .frame(width: metrics.scaledSize.width, height: metrics.scaledSize.height)
                     }
                 }
+                // Collapsed into a single accessibility element.
+                //
+                // A device profile put ~44% of all main-thread time in
+                // `AccessibilityViewGraph.needsUpdate`, and 37% in
+                // `AccessibilityNode.visibility.getter` alone — SwiftUI rebuilding an
+                // accessibility attachment for every node on every display-link tick. The
+                // displays are decorative pixel art built from thousands of views, because
+                // `StarText` alone is six per label, so that tree is enormous and none of it
+                // is useful to a screen reader glyph by glyph. Ignoring the children stops
+                // the walk; the label below keeps the screen described.
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(accessibilitySummary)
                 .offset(x: burnInOffset.x, y: burnInOffset.y)
                 // Opaque before the shader samples it. A layer with transparent regions
                 // makes every per-channel read a premultiplied one, and the tube has to
