@@ -17,3 +17,5 @@ server/music/*
 !server/music/.gitkeep
 
 .DS_Store
+__pycache__/
+*.pyc
