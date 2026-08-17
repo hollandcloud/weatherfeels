@@ -5,6 +5,12 @@ A native SwiftUI recreation of [netbymatt/ws4kp](https://github.com/netbymatt/ws
 The Weather Channel's WeatherStar 4000 local forecast unit — running on **tvOS,
 iOS, iPadOS and macOS**, with support for your own background music.
 
+It ships on the App Store as **weatherfeels**. The Xcode project, the Swift package
+and most of the type names still read `WeatherStar`, which is deliberate: renaming an
+app is about what the store and the user see, and churning every internal symbol would
+be a large diff for no benefit. References below to the WeatherStar 4000 describe the
+original hardware and the upstream project, not this app.
+
 Live data comes from the US National Weather Service. No accounts, no API keys,
 no analytics, no tracking.
 
