@@ -33,7 +33,7 @@ docs/
 
 ## Before you submit
 
-**1. The artwork still carries the mark.** The name is settled — "ws4kp nostalgia" — but
+**1. The artwork still carries the mark.** The name is settled — "weatherfeels" — but
 the app icon *is* the WEATHER STAR 4000+ badge, and so is the corner logo on every
 display, which means it is in all 23 screenshots. An icon reading WEATHER STAR 4000+
 under a name chosen to avoid it defeats the point of the rename, and the icon is the most
@@ -81,9 +81,9 @@ What changes on a rename, all of it mechanical:
 
 | Where | Now |
 |---|---|
-| `Store/metadata/en-US/name.txt` | WeatherStar |
-| `description.txt` | opens "WeatherStar puts a continuous…" |
-| `CFBundleDisplayName` in all three `Apps/*/Info.plist` | WeatherStar |
+| `Store/metadata/en-US/name.txt` | weatherfeels |
+| `description.txt` | opens "weatherfeels puts a continuous…" |
+| `CFBundleDisplayName` in all three `Apps/*/Info.plist` | weatherfeels |
 | The corner logo artwork | "WEATHER STAR 4000+" — already swappable at build time via `WS4KLogoImageName`, see `project.yml` |
 | App Store Connect app name | needs changing in the browser |
 
@@ -117,10 +117,10 @@ Settled since the first draft:
 
 - **Free, no in-app purchases, no subscription.** The description says so, and it matters
   for more than the pricing page — see the name section above.
-- **Name** — "ws4kp nostalgia". Applied to `name.txt`, the description, and
-  `CFBundleDisplayName` on all three platforms; the startup screen now reads "ws4kp /
-  nostalgia" via `WS4KStartupTitle`. The two usage strings no longer name the app at all,
-  since they read fine as "This app uses your location…".
+- **Name** — "weatherfeels". Applied to `name.txt`, the description, and
+  `CFBundleDisplayName` on all three platforms; the startup screen now reads
+  "weatherfeels" via `WS4KStartupTitle`. The two usage strings no longer name the app at
+  all, since they read fine as "This app uses your location…".
 - **Contact** — hollandkevin@icloud.com, phone 844-247-4274.
 - **Age rating** — everything answered "None", which produces 4+. Recorded in
   `metadata/age-rating.md`; the questionnaire itself still has to be clicked through in

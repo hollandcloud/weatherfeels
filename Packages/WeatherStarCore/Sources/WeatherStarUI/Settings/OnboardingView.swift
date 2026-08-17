@@ -34,7 +34,7 @@ public struct OnboardingView: View {
 
         var title: String {
             switch self {
-            case .welcome: "WeatherStar 4000+"
+            case .welcome: "weatherfeels"
             case .location: "Choose a location"
             case .music: "Music (optional)"
             }
@@ -135,7 +135,7 @@ public struct OnboardingView: View {
             .disabled(isResolvingLocation || locationService.isDenied)
 
             if locationService.isDenied {
-                Text("Location access is off. Search for a place instead, or enable it in system settings.")
+                Text("Location access is off. Search for a place instead.")
                     .font(.footnote)
                     .foregroundStyle(.orange)
             }
@@ -192,8 +192,7 @@ public struct OnboardingView: View {
             HStack {
                 Button("Back") { step = .welcome }
                 Spacer()
-                // Skipping is allowed: the app falls back to the device location.
-                Button("Skip") { step = .music }
+                Button("Skip") { skipLocation() }
             }
         }
         .padding(.vertical, 48)
@@ -235,6 +234,11 @@ public struct OnboardingView: View {
         settings.locationMode = .manual
         settings.savedLocation = location
         settings.rememberRecent(location)
+        step = .music
+    }
+
+    private func skipLocation() {
+        settings.locationMode = .manual
         step = .music
     }
 

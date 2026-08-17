@@ -29,7 +29,7 @@ public enum LocationError: Error, LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case .authorizationDenied:
-            "Location access was denied. You can choose a location manually in Settings."
+            "Location access was denied. Search for a place instead."
         case .authorizationRestricted:
             "Location access is restricted on this device."
         case .servicesDisabled:

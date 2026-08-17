@@ -77,7 +77,7 @@ public actor NWSClient {
     /// NWS asks that clients identify themselves with contact information.
     private static var defaultUserAgent: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        return "WeatherStar4000-Apple/\(version) (https://github.com/netbymatt/ws4kp)"
+        return "weatherfeels/\(version) (https://github.com/netbymatt/ws4kp)"
     }
 
     // MARK: - Core request

@@ -1,8 +1,8 @@
-# Privacy Policy — WeatherStar
+# Privacy Policy — weatherfeels
 
 _Last updated: 5 August 2026_
 
-WeatherStar does not have accounts, does not have a server, and does not collect
+weatherfeels does not have accounts, does not have a server, and does not collect
 analytics. This policy is short because there is very little to describe.
 
 ## What leaves your device

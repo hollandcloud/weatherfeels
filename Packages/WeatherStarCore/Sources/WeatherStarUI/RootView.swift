@@ -239,18 +239,18 @@ public struct RootView: View {
     private func resolveLocationAndLoad() async {
         if settings.locationMode == .device {
             // Draw the last known place immediately so the screen is not empty while
-            // a new fix is acquired.
-            if let cached = settings.savedLocation {
-                store.load(location: cached)
-            }
+            // a new fix is acquired. Without a cached device location, do not ask for
+            // permission here; the request belongs to the explicit onboarding/settings
+            // action that selects device location.
+            guard let cached = settings.savedLocation else { return }
+            store.load(location: cached)
+
             if let fresh = try? await locationService.currentLocation() {
                 // Only reload when the point moved enough to change the forecast grid.
-                let moved = settings.savedLocation.map {
-                    Calc.haversineKilometers(
-                        lat1: $0.latitude, lon1: $0.longitude,
-                        lat2: fresh.latitude, lon2: fresh.longitude
-                    ) > 2
-                } ?? true
+                let moved = Calc.haversineKilometers(
+                    lat1: cached.latitude, lon1: cached.longitude,
+                    lat2: fresh.latitude, lon2: fresh.longitude
+                ) > 2
                 settings.savedLocation = fresh
                 if moved { store.load(location: fresh) }
                 return

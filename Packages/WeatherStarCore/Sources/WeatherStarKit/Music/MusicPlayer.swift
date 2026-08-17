@@ -330,7 +330,7 @@ public final class MusicPlayer {
         guard let track = currentTrack else { return clearNowPlaying() }
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: track.title,
-            MPMediaItemPropertyArtist: "WeatherStar 4000+",
+            MPMediaItemPropertyArtist: "weatherfeels",
             MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
         ]
         if let duration = player?.currentItem?.duration, duration.isNumeric {

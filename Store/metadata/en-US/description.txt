@@ -1,6 +1,6 @@
 A local forecast channel for your television, rebuilt for Apple platforms.
 
-ws4kp nostalgia puts a continuous, rotating weather broadcast on your screen — the kind that used to run between programmes on cable, with a slow crawl of conditions along the bottom and music playing over the top. Every forecast is live from the US National Weather Service. Leave it running on a TV, a monitor, or in a window while you work.
+weatherfeels puts a continuous, rotating weather broadcast on your screen — the kind that used to run between programmes on cable, with a slow crawl of conditions along the bottom and music playing over the top. Every forecast is live from the US National Weather Service. Leave it running on a TV, a monitor, or in a window while you work.
 
 WHAT IT SHOWS
 

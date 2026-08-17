@@ -46,7 +46,7 @@ public enum AppleMusicError: Error, LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case .notAuthorized:
-            "WeatherStar has not been allowed access to Apple Music."
+            "weatherfeels has not been allowed access to Apple Music."
         case .noSubscription:
             "Playing an Apple Music playlist needs an active Apple Music subscription."
         case .playlistNotFound:

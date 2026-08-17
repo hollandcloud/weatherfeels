@@ -102,12 +102,19 @@ public struct SettingsView: View {
         Binding(
             get: { settings.locationMode },
             set: { mode in
-                settings.locationMode = mode
-                guard mode == .device else { return }
-                // Switching back to the device requires a fresh fix.
+                guard mode == .device else {
+                    settings.locationMode = mode
+                    return
+                }
+
+                // Switching back to the device requires an explicit fresh fix. Only
+                // persist device mode after that succeeds, so a denied permission choice
+                // leaves the app on the user's previous location mode.
                 Task {
                     if let location = try? await locationService.currentLocation() {
+                        settings.locationMode = .device
                         settings.savedLocation = location
+                        settings.rememberRecent(location)
                         onLocationChange(location)
                     }
                 }

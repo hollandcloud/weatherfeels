@@ -369,7 +369,7 @@ public struct MusicSettingsView: View {
                 ProgressView()
 
             case .notDetermined:
-                Text("WeatherStar needs your permission to read your Apple Music library.")
+                Text("weatherfeels needs your permission to read your Apple Music library.")
                     .font(.footnote)
                 Button("Allow Access to Apple Music") {
                     Task {

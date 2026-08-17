@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>ws4kp nostalgia</string>
+	<string>weatherfeels</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>$(PRODUCT_NAME)</string>
+	<string>weatherfeels</string>
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
@@ -33,8 +33,8 @@
 	<key>UIUserInterfaceStyle</key>
 	<string>Dark</string>
 	<key>WS4KStartupSubtitle</key>
-	<string>nostalgia</string>
+	<string></string>
 	<key>WS4KStartupTitle</key>
-	<string>ws4kp</string>
+	<string>weatherfeels</string>
 </dict>
 </plist>
