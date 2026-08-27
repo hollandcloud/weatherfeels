@@ -14,11 +14,19 @@ Then:
     Tools/asc.py screenshots              # upload Store/screenshots/<platform>/
     Tools/asc.py review                   # App Review contact details and notes
     Tools/asc.py agerating                # the questionnaire, all answers "none"
+    Tools/asc.py attach [build]           # point the editable versions at a build
+    Tools/asc.py submit                   # put them in front of App Review
     Tools/asc.py all
 
 `status` is read-only; run it first and after anything else. It prints which platforms
 exist on the record and the `screenshotDisplayType` of every set, which is how the
 constants below were confirmed rather than assumed.
+
+`submit` cannot rescue a rejected submission. Once App Review returns a submission with
+UNRESOLVED_ISSUES, the API will neither resubmit it ("Version is not ready to be
+submitted yet", forever) nor let the version out of it ("Item was already submitted").
+That has to be closed out in Resolution Center in the browser first; everything up to
+and including attaching the new build can be done from here.
 
 `text` will happily overwrite a name or subtitle edited in the browser, because the
 files under Store/metadata are the source of truth. If someone has changed either in
@@ -464,6 +472,99 @@ def push_age_rating() -> None:
         print(f"  appInfo {info['id']}: {len(remaining)} answers set{note}")
 
 
+def latest_build(app: str, version: str | None = None) -> dict | None:
+    """The newest processed build, or a named one."""
+    query = f"/v1/builds?filter[app]={app}&limit=20&sort=-uploadedDate"
+    query += "&fields[builds]=version,processingState,uploadedDate"
+    for build in call("GET", query)["data"]:
+        attributes = build["attributes"]
+        if attributes.get("processingState") != "VALID":
+            continue
+        if version is None or attributes.get("version") == version:
+            return build
+    return None
+
+
+def attach_build(version: str | None = None) -> None:
+    """Point each editable version at a processed build."""
+    app = app_id()
+    build = latest_build(app, version)
+    if not build:
+        sys.exit(f"no processed build{' ' + version if version else ''} yet")
+
+    for platform, version_id in editable_versions().items():
+        call(
+            "PATCH",
+            f"/v1/appStoreVersions/{version_id}/relationships/build",
+            {"data": {"type": "builds", "id": build["id"]}},
+        )
+        print(f"  {platform}: build {build['attributes']['version']} attached")
+
+
+def submit_for_review() -> None:
+    """Put the editable versions in front of App Review.
+
+    Two steps, because a submission is a container: create one for the platform, add
+    the version to it as an item, then flip it to submitted. Re-running is safe — an
+    existing submission for the platform is reused rather than duplicated.
+    """
+    app = app_id()
+    existing = {
+        item["attributes"]["platform"]: item
+        for item in call(
+            "GET", f"/v1/reviewSubmissions?filter[app]={app}&filter[state]=READY_FOR_REVIEW"
+        )["data"]
+    }
+
+    for platform, version_id in editable_versions().items():
+        submission = existing.get(platform)
+        if submission is None:
+            submission = call(
+                "POST",
+                "/v1/reviewSubmissions",
+                {
+                    "data": {
+                        "type": "reviewSubmissions",
+                        "attributes": {"platform": platform},
+                        "relationships": {
+                            "app": {"data": {"type": "apps", "id": app}}
+                        },
+                    }
+                },
+            )["data"]
+
+        call(
+            "POST",
+            "/v1/reviewSubmissionItems",
+            {
+                "data": {
+                    "type": "reviewSubmissionItems",
+                    "relationships": {
+                        "reviewSubmission": {
+                            "data": {"type": "reviewSubmissions", "id": submission["id"]}
+                        },
+                        "appStoreVersion": {
+                            "data": {"type": "appStoreVersions", "id": version_id}
+                        },
+                    },
+                }
+            },
+        )
+
+        call(
+            "PATCH",
+            f"/v1/reviewSubmissions/{submission['id']}",
+            {
+                "data": {
+                    "type": "reviewSubmissions",
+                    "id": submission["id"],
+                    "attributes": {"submitted": True},
+                }
+            },
+        )
+        print(f"  {platform}: submitted for review ({submission['id']})")
+
+
 def upload_one(set_id: str, image: Path) -> None:
     payload = image.read_bytes()
     reservation = call(
@@ -593,6 +694,10 @@ def main() -> None:
         push_review()
     elif command == "agerating":
         push_age_rating()
+    elif command == "attach":
+        attach_build(sys.argv[2] if len(sys.argv) > 2 else None)
+    elif command == "submit":
+        submit_for_review()
     elif command == "all":
         push_text()
         push_screenshots()
