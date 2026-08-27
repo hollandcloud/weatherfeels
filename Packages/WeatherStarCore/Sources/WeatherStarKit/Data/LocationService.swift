@@ -10,10 +10,16 @@ public enum LocationMode: String, Codable, Sendable, CaseIterable {
     /// A place the user picked or searched for.
     case manual
 
+    /// Names the setting, not an action.
+    ///
+    /// These label the two options of a Settings picker, so they say what the app will
+    /// follow rather than inviting the user to grant something. "Use this device's
+    /// location" was the exact phrasing App Review objected to on the onboarding button
+    /// under guideline 5.1.1(iv), and there is no reason to leave it anywhere.
     public var displayName: String {
         switch self {
-        case .device: "Use this device's location"
-        case .manual: "Choose a location"
+        case .device: "This device"
+        case .manual: "A place I choose"
         }
     }
 }
@@ -85,6 +91,15 @@ public final class LocationService: NSObject, @preconcurrency CLLocationManagerD
 
     public var isDenied: Bool {
         authorizationStatus == .denied || authorizationStatus == .restricted
+    }
+
+    /// Whether the system prompt has been answered, either way.
+    ///
+    /// Onboarding gates on this rather than on the answer: what matters for guideline
+    /// 5.1.1(iv) is that a screen shown *ahead* of the prompt offers no way past it, and
+    /// that stops applying the moment the user has answered.
+    public var hasAnsweredAuthorization: Bool {
+        authorizationStatus != .notDetermined
     }
 
     // MARK: - Authorization

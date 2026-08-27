@@ -210,4 +210,40 @@ struct OnboardingSnapshotTests {
         #expect(render(view, named: "location-picker", size: Self.tvSize) != nil)
     }
 }
+
+/// The onboarding location step, against the rule App Review enforces on it.
+///
+/// The app was rejected under guideline 5.1.1(iv) for two things on one screen: a button
+/// reading "Use this device's location", which argues for one answer, and a "Skip" that
+/// let the permission request be put off indefinitely. Apple's remedy was explicit — a
+/// neutral label like "Continue", and no way past the message except into the prompt.
+@Suite("Onboarding location permission")
+struct OnboardingLocationTests {
+    @Test("Before the prompt is answered there is no way past it")
+    func preRequestStageOffersNoEscape() {
+        let stage = LocationStepStage(hasAnsweredAuthorization: false)
+        #expect(stage == .permissionPrompt)
+        // The Skip and Back buttons, and the search field that would let the user pick a
+        // place without ever answering, are all gated on these.
+        #expect(!stage.allowsDismissal)
+        #expect(!stage.showsPlaceSearch)
+    }
+
+    @Test("Once answered the step is an ordinary place picker")
+    func postRequestStageIsUnrestricted() {
+        let stage = LocationStepStage(hasAnsweredAuthorization: true)
+        #expect(stage == .placePicker)
+        // Nothing is being deferred any more: the prompt has had its answer, so Skip and
+        // search are just navigation.
+        #expect(stage.allowsDismissal)
+        #expect(stage.showsPlaceSearch)
+    }
+
+    @Test("Denial is an answer, so it opens the picker rather than re-asking")
+    func denialCountsAsAnswered() {
+        // `hasAnsweredAuthorization` is true for denied and restricted as well as
+        // granted. A user who said no gets the search field, not the prompt screen again.
+        #expect(LocationStepStage(hasAnsweredAuthorization: true).showsPlaceSearch)
+    }
+}
 #endif

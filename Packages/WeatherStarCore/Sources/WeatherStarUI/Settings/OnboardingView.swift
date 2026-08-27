@@ -6,6 +6,36 @@ import WeatherStarKit
 ///
 /// Kept deliberately short — three steps, all skippable — because the app is usable
 /// with nothing but a location, and that can come from the device.
+/// Which half of the onboarding location step is on screen.
+///
+/// Split out as its own type because the rule it encodes is one App Review enforces, and
+/// a rule worth enforcing is worth testing. Guideline 5.1.1(iv): a custom message shown
+/// ahead of a permission request must lead into that request and nowhere else — no Skip,
+/// no Back, no button phrased to talk the user into saying yes. Once the prompt has been
+/// answered, none of that applies any more and the step is an ordinary place picker.
+enum LocationStepStage: Equatable {
+    /// Nothing has been asked yet. One button, and it opens the system prompt.
+    case permissionPrompt
+    /// The prompt has been answered, either way. Search, results, Back and Skip.
+    case placePicker
+
+    init(hasAnsweredAuthorization: Bool) {
+        self = hasAnsweredAuthorization ? .placePicker : .permissionPrompt
+    }
+
+    /// Whether the step may offer any way past it other than the permission prompt.
+    ///
+    /// This is the specific thing the app was rejected for: a "Skip" button on the
+    /// pre-prompt screen let the user defer the request indefinitely.
+    var allowsDismissal: Bool { self == .placePicker }
+
+    /// Whether the step may talk about picking a place by hand.
+    ///
+    /// Also false before the prompt: offering a search field alongside the explanation
+    /// is another way of making the request skippable.
+    var showsPlaceSearch: Bool { self == .placePicker }
+}
+
 public struct OnboardingView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(LocationService.self) private var locationService
@@ -112,37 +142,76 @@ public struct OnboardingView: View {
 
     // MARK: - Location
 
+    private var stage: LocationStepStage {
+        LocationStepStage(hasAnsweredAuthorization: locationService.hasAnsweredAuthorization)
+    }
+
     private var locationStep: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text(Step.location.title)
                 .font(.largeTitle.bold())
                 .foregroundStyle(.white)
-            Text("Forecasts come from the National Weather Service, so US locations only.")
-                .font(.callout)
-                .foregroundStyle(.white.opacity(0.75))
+
+            switch stage {
+            case .permissionPrompt: permissionPrompt
+            case .placePicker: placePicker
+            }
+        }
+        .padding(.vertical, 48)
+    }
+
+    /// Everything shown before the system location prompt has been answered.
+    ///
+    /// Deliberately one button, phrased neutrally, and no way around it. App Review
+    /// rejected the previous version of this screen under guideline 5.1.1(iv) on two
+    /// counts: the button read "Use this device's location", which is a nudge towards
+    /// one answer, and a "Skip" button let the request be deferred for good. The text
+    /// below explains what the prompt is for without arguing for a particular answer,
+    /// and "Continue" leads straight into it.
+    private var permissionPrompt: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text(
+                """
+                Forecasts come from the US National Weather Service, so the app needs a \
+                place to show them for — either where this device is, or a US city you \
+                name yourself. Continue to choose.
+                """
+            )
+            .font(.callout)
+            .foregroundStyle(.white.opacity(0.75))
 
             Button {
-                useDeviceLocation()
+                continueToPermissionPrompt()
             } label: {
                 HStack {
-                    Image(systemName: "location.fill")
-                    Text(isResolvingLocation ? "Locating…" : "Use this device's location")
+                    Text(isResolvingLocation ? "Locating…" : "Continue")
                     if isResolvingLocation { ProgressView().padding(.leading, 4) }
                 }
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .disabled(isResolvingLocation || locationService.isDenied)
+            .disabled(isResolvingLocation)
 
+            if let locationError {
+                Text(locationError)
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+            }
+
+            Spacer()
+        }
+    }
+
+    /// Everything shown once the prompt has been answered, whichever way it went.
+    private var placePicker: some View {
+        VStack(alignment: .leading, spacing: 20) {
             if locationService.isDenied {
                 Text("Location access is off. Search for a place instead.")
                     .font(.footnote)
                     .foregroundStyle(.orange)
             }
 
-            Divider().overlay(.white.opacity(0.3))
-
-            Text("Or search for a place")
+            Text("Search for a place")
                 .font(.headline)
                 .foregroundStyle(.white)
 
@@ -171,6 +240,13 @@ public struct OnboardingView: View {
                 Text(locationError)
                     .font(.footnote)
                     .foregroundStyle(.orange)
+
+                // Only a retry, and only once access is already granted, so it cannot
+                // produce a permission prompt however it is labelled.
+                if !locationService.isDenied {
+                    Button("Try this device again") { resolveDeviceLocation() }
+                        .disabled(isResolvingLocation)
+                }
             }
 
             // Results are tappable rows; picking one advances the flow.
@@ -189,29 +265,49 @@ public struct OnboardingView: View {
 
             Spacer()
 
-            HStack {
-                Button("Back") { step = .welcome }
-                Spacer()
-                Button("Skip") { skipLocation() }
+            if stage.allowsDismissal {
+                HStack {
+                    Button("Back") { step = .welcome }
+                    Spacer()
+                    Button("Skip") { skipLocation() }
+                }
             }
         }
-        .padding(.vertical, 48)
     }
 
-    private func useDeviceLocation() {
+    /// The only action available before the prompt: open it, then act on the answer.
+    private func continueToPermissionPrompt() {
         isResolvingLocation = true
         locationError = nil
         Task {
-            defer { isResolvingLocation = false }
-            do {
-                let location = try await locationService.currentLocation()
-                settings.locationMode = .device
-                settings.savedLocation = location
-                settings.rememberRecent(location)
-                step = .music
-            } catch {
-                locationError = error.localizedDescription
+            // Returns once the user has answered. Whatever they chose, the step moves on
+            // to the place picker — the answer is what un-gates the rest of the screen.
+            await locationService.requestAuthorization()
+            guard !locationService.isDenied else {
+                isResolvingLocation = false
+                return
             }
+            await resolveFix()
+        }
+    }
+
+    private func resolveDeviceLocation() {
+        isResolvingLocation = true
+        locationError = nil
+        Task { await resolveFix() }
+    }
+
+    private func resolveFix() async {
+        defer { isResolvingLocation = false }
+        do {
+            let location = try await locationService.currentLocation()
+            settings.locationMode = .device
+            settings.savedLocation = location
+            settings.rememberRecent(location)
+            step = .music
+        } catch {
+            // Left on the place picker with the reason showing, rather than blocked.
+            locationError = error.localizedDescription
         }
     }
 
