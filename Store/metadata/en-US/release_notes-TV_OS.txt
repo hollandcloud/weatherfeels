@@ -1,7 +1,7 @@
 • The whole rotation, by default. Hourly Forecast, Travel, the hourly graph and the
   severe-weather outlook used to start switched off. Everything is on now; turn off what
   you do not want in Settings.
-• A new app icon and on-screen mark.
+• A new app icon, top shelf artwork and on-screen mark.
 
 Fixed
 • The first-run screens had text that came out dark on the blue background under a light

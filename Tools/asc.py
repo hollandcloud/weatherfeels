@@ -11,6 +11,8 @@ Then:
 
     Tools/asc.py status                   # what ASC currently has. Run this first.
     Tools/asc.py text                     # name, subtitle, description, keywords, URLs
+                                          # release notes come from
+                                          # release_notes-<PLATFORM>.txt where present
     Tools/asc.py screenshots              # upload Store/screenshots/<platform>/
     Tools/asc.py review                   # App Review contact details and notes
     Tools/asc.py agerating                # the questionnaire, all answers "none"
@@ -328,7 +330,13 @@ def push_text() -> None:
                 "description": read("description"),
                 "keywords": read("keywords"),
                 "promotionalText": read("promotional_text"),
-                "whatsNew": read("release_notes"),
+                # Per platform where a file exists, falling back to the shared one.
+                # What is new is genuinely different per platform here: the television is
+                # the headline on iPhone and iPad, is reachable on a Mac only by making
+                # the window tall, and does not exist on Apple TV, which never has a
+                # portrait screen. One set of notes for all three meant the Apple TV
+                # listing opening with "Turn your iPhone or iPad upright".
+                "whatsNew": read(f"release_notes-{platform}") or read("release_notes"),
                 "supportUrl": read("support_url"),
                 "marketingUrl": read("marketing_url"),
             }

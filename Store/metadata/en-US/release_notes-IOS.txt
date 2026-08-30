@@ -1,0 +1,21 @@
+Turn your iPhone or iPad upright and the forecast now plays on a television.
+
+• The set. In portrait the picture sits on a CRT instead of being stretched up the
+  screen. Its buttons work: settings, back and forward through the rotation, and a power
+  button that switches the tube off the way it used to.
+• Three finishes. Studio monitor grey, wood veneer, or black plastic.
+• Rotation. The app opens in landscape, filling the screen with the picture. Turn the
+  device for the television. If you would rather have the set in both orientations, there
+  is now a switch for that.
+• The tube, by default. The CRT screen effect and medium scanlines are on out of the box.
+• The whole rotation, by default. Hourly Forecast, Travel, the hourly graph and the
+  severe-weather outlook used to start switched off. Everything is on now; turn off what
+  you do not want in Settings.
+• A new app icon and on-screen mark.
+
+Fixed
+• Current Conditions printed its labels through its readings on the narrower layouts —
+  "Pressure:" and the reading beside it ran into each other.
+• The Hourly Forecast wind column lost its last digit at the right edge.
+• The first-run screens had text that came out dark on the blue background in light mode,
+  and was close to unreadable.
