@@ -114,7 +114,7 @@ public struct RootView: View {
             }
             #endif
 
-            WeatherStarView()
+            WeatherStarView(onOpenSettings: { isShowingSettings = true })
 
             if isShowingControls {
                 ControlsOverlay(

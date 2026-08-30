@@ -602,13 +602,20 @@ struct SettingsTests {
     @Test("Toggling a display in the rotation persists")
     func displayToggles() {
         let (settings, defaults) = makeSettings()
+        // Everything starts on, so this exercises a switch off and back on again rather
+        // than the other way round.
         #expect(settings.isEnabled(.currentWeather))
-        #expect(!settings.isEnabled(.hourly))
+        #expect(settings.isEnabled(.hourly))
 
-        settings.setEnabled(true, for: .hourly)
+        settings.setEnabled(false, for: .hourly)
         settings.setEnabled(false, for: .currentWeather)
 
-        let reloaded = AppSettings(defaults: defaults)
+        var reloaded = AppSettings(defaults: defaults)
+        #expect(!reloaded.isEnabled(.hourly))
+        #expect(!reloaded.isEnabled(.currentWeather))
+
+        settings.setEnabled(true, for: .hourly)
+        reloaded = AppSettings(defaults: defaults)
         #expect(reloaded.isEnabled(.hourly))
         #expect(!reloaded.isEnabled(.currentWeather))
     }

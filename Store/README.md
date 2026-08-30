@@ -13,7 +13,7 @@ Store/
       promotional_text.txt      170             — 149
       keywords.txt              100             — 77
       description.txt           4000            — 3061
-      release_notes.txt         4000            — "First public release."
+      release_notes.txt         4000            — what changed in this version
       support_url.txt           docs/support.md in this repo
       privacy_policy_url.txt    docs/privacy.md in this repo
       marketing_url.txt         the repo itself
@@ -22,8 +22,8 @@ Store/
     age-rating.md               the age-rating questionnaire answers
   screenshots/
     tvos/     3840x2160         Apple TV
-    iphone/   2868x1320         6.9", landscape — the app locks landscape on a phone
-    ipad/     2064x2752         13", portrait — the app has a real portrait layout on iPad
+    iphone/   2868x1320         6.9", landscape — the picture filling the screen
+    ipad/     2064x2752         13", portrait — the picture on the television
     mac/      2880x1800         window at 1440x810 (16:9), padded to a size Apple accepts
 
 docs/
@@ -33,20 +33,30 @@ docs/
 
 ## Before you submit
 
-**1. The artwork still carries the mark.** The name is settled — "weatherfeels" — but
-the app icon *is* the WEATHER STAR 4000+ badge, and so is the corner logo on every
-display, which means it is in all 23 screenshots. An icon reading WEATHER STAR 4000+
-under a name chosen to avoid it defeats the point of the rename, and the icon is the most
-visible surface there is: search results, product page, and the device itself.
+**1. The artwork.** Through 1.0 the app icon *was* the WEATHER STAR 4000+ badge, and so
+was the corner logo on every display, which put it in all 23 screenshots — an icon
+carrying the mark under a name chosen to avoid it, on the most visible surface there is.
 
-**Decided: the badge stays as it is.** Kevin's call, made with the trade-off in front of
-him. So the position going into review is a name that avoids the mark, a description that
-never uses it except to disclaim, and artwork that still shows it. If that draws a
-5.2.1 rejection or a complaint later, the badge is the thing to change, and it is not
-much work: `Tools/MakeIcons.swift` draws it from three lines of text, the corner logo
-already has the `WS4KLogoImageName` hook, and the screenshot harness can re-shoot the set
-in about twenty minutes. A generated `WS4KP / NOSTALGIA` alternative has been rendered and
-checked once already, so that route is proven if it is ever wanted.
+**Resolved in 1.1: the badge no longer carries the mark.** It reads `WEATHER / FEELS`,
+on the app icon and on the corner logo of every display, so the rename is now complete
+across the name, the listing copy and the artwork alike.
+
+Both come from text rather than from a checked-in image:
+
+- The corner badge is drawn by `StarLogoBadge` in `StarBranding.swift`, from the
+  `WS4KLogoLines` key in each `Apps/<platform>/Info.plist` (`WEATHER|FEELS`). A fork sets
+  its own there, or supplies real artwork through the older `WS4KLogoImageName` hook.
+- The app icon is drawn by `Tools/MakeIcons.swift`, from `wordmarkLines` in that file.
+
+Neither is set in a Star4000 face. All four of those are the light, wide-spaced
+letterforms of a character generator — right on screen, where they *are* the picture, and
+far too thin for a mark that has to hold together at icon size. Both use a bold condensed
+grotesque instead, which is what a broadcast logo of the period was set in and what the
+original badge artwork itself used.
+
+The screenshots were re-shot for all four platforms at the same time; `Tools/shoot.sh` and
+`Tools/shoot-mac.sh` do that in about twenty minutes. Anything that changes on-screen
+artwork needs the same treatment, or the store page stops matching the app.
 
 Being free and open source helps the underlying position considerably: it puts this in
 the same posture as `ws4kp` itself, whose defence is that it is "a free, non-profit work
@@ -75,9 +85,9 @@ by fans". That was the one thing a paid listing could not claim.
 
 That is a tested-in-review template, and this listing already follows most of it: the
 description never names TWC except to disclaim, and it closes with a non-affiliation
-sentence. The name and the corner logo are the parts still carrying the mark.
+sentence. Since 1.1 the name and the artwork are clear of the mark as well.
 
-The rename is done everywhere except the artwork: `name.txt`, the description,
+The rename covers, besides the artwork above: `name.txt`, the description,
 `CFBundleDisplayName` and `CFBundleName` on all three platforms, the startup screen via
 `WS4KStartupTitle`, the onboarding and Apple Music strings, the NWS `User-Agent`, the
 Now Playing artist, this privacy policy, and the record in App Store Connect.

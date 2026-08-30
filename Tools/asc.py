@@ -128,9 +128,19 @@ class ASCError(Exception):
         ASC reports that as a 409 naming the attribute rather than ignoring it. Reading
         the name back out lets the caller drop that one field and keep the rest, instead
         of the whole listing failing on a field that was never going to apply.
+
+        Apple words this refusal two different ways, and which one you get depends on the
+        field. `privacyPolicyUrl` on a live version gives the second, so matching only the
+        first meant the whole run died on it once 1.0 was on sale.
         """
-        match = re.search(r"Attribute '(\w+)' cannot be edited", self.body)
-        return match.group(1) if match else None
+        for pattern in (
+            r"Attribute '(\w+)' cannot be edited",
+            r"field '(\w+)' can ?not be modified",
+        ):
+            match = re.search(pattern, self.body)
+            if match:
+                return match.group(1)
+        return None
 
 
 def call(method: str, path: str, body: dict | None = None, raw: bytes | None = None,
@@ -272,18 +282,40 @@ def push_text() -> None:
             attributes = {k: v for k, v in attributes.items() if v}
             if not attributes:
                 continue
-            call(
-                "PATCH",
-                f"/v1/appInfoLocalizations/{localization['id']}",
-                {
-                    "data": {
-                        "type": "appInfoLocalizations",
-                        "id": localization["id"],
-                        "attributes": attributes,
-                    }
-                },
-            )
-            print(f"  appInfo {localization['id']}: {', '.join(attributes)}")
+
+            # Same drop-and-retry as the per-version fields below, and for the same
+            # reason: an app with a live version has more than one `appInfo`, and the one
+            # attached to what is on sale is frozen. Patching it used to abort the whole
+            # run — including the description and release notes for the version actually
+            # being prepared, which is the part that matters.
+            dropped = []
+            while attributes:
+                try:
+                    call(
+                        "PATCH",
+                        f"/v1/appInfoLocalizations/{localization['id']}",
+                        {
+                            "data": {
+                                "type": "appInfoLocalizations",
+                                "id": localization["id"],
+                                "attributes": attributes,
+                            }
+                        },
+                        tolerate=True,
+                    )
+                    break
+                except ASCError as error:
+                    name = error.uneditable_attribute()
+                    if name is None or name not in attributes:
+                        print(f"  appInfo {localization['id']}: skipped — {error}")
+                        attributes = {}
+                        break
+                    del attributes[name]
+                    dropped.append(name)
+
+            if attributes:
+                note = f" (locked: {', '.join(dropped)})" if dropped else ""
+                print(f"  appInfo {localization['id']}: {', '.join(attributes)}{note}")
 
     # Everything else is per-version, and therefore per-platform.
     for platform, version_id in editable_versions().items():
@@ -472,10 +504,22 @@ def push_age_rating() -> None:
         print(f"  appInfo {info['id']}: {len(remaining)} answers set{note}")
 
 
-def latest_build(app: str, version: str | None = None) -> dict | None:
-    """The newest processed build, or a named one."""
-    query = f"/v1/builds?filter[app]={app}&limit=20&sort=-uploadedDate"
-    query += "&fields[builds]=version,processingState,uploadedDate"
+def latest_build(app: str, platform: str, version: str | None = None) -> dict | None:
+    """The newest processed build for one platform, or a named one.
+
+    Filtered by platform, which is not optional: a build belongs to exactly one, and an
+    App Store version will only accept its own. Picking the newest build overall and
+    attaching it to all three versions — which is what this did — can only ever succeed
+    for whichever platform happened to upload last, and fails the other two with "The
+    specified build has a different platform than the version". That went unnoticed while
+    only iOS had builds.
+    """
+    query = (
+        f"/v1/builds?filter[app]={app}"
+        f"&filter[preReleaseVersion.platform]={platform}"
+        "&limit=20&sort=-uploadedDate"
+        "&fields[builds]=version,processingState,uploadedDate"
+    )
     for build in call("GET", query)["data"]:
         attributes = build["attributes"]
         if attributes.get("processingState") != "VALID":
@@ -486,19 +530,29 @@ def latest_build(app: str, version: str | None = None) -> dict | None:
 
 
 def attach_build(version: str | None = None) -> None:
-    """Point each editable version at a processed build."""
+    """Point each editable version at a processed build of its own platform."""
     app = app_id()
-    build = latest_build(app, version)
-    if not build:
-        sys.exit(f"no processed build{' ' + version if version else ''} yet")
+    waiting = []
 
     for platform, version_id in editable_versions().items():
+        build = latest_build(app, platform, version)
+        if not build:
+            # Not fatal, and usually just a matter of time: Apple takes several minutes to
+            # process an upload, and the three platforms finish at their own pace. Report
+            # and carry on, so the ones that are ready get attached.
+            waiting.append(platform)
+            print(f"  {platform}: no processed build yet")
+            continue
+
         call(
             "PATCH",
             f"/v1/appStoreVersions/{version_id}/relationships/build",
             {"data": {"type": "builds", "id": build["id"]}},
         )
         print(f"  {platform}: build {build['attributes']['version']} attached")
+
+    if waiting:
+        print(f"\nStill processing: {', '.join(waiting)}. Re-run `attach` in a few minutes.")
 
 
 def submit_for_review() -> None:

@@ -32,6 +32,8 @@
 	<string>MIT licensed. Weather data courtesy of NOAA/NWS.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app uses your location to show the local forecast from the National Weather Service. Your location is never stored or shared.</string>
+	<key>WS4KLogoLines</key>
+	<string>WEATHER|FEELS</string>
 	<key>WS4KStartupSubtitle</key>
 	<string></string>
 	<key>WS4KStartupTitle</key>

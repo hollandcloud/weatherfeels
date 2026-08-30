@@ -26,6 +26,37 @@ public enum LayoutMode: String, Codable, Sendable, CaseIterable {
     }
 }
 
+/// How the cabinet around the picture is finished.
+///
+/// Only the cabinet changes. An earlier version also built a room around it — a lit wall,
+/// a surface, coloured gels — and it was the wrong idea: a scene competes with the picture
+/// instead of presenting it, and the picture is the whole point. What is left is the set
+/// itself, on black, in whichever material suits.
+public enum TelevisionFinish: String, Codable, Sendable, CaseIterable {
+    /// Neutral grey, the colour of rack and edit-suite equipment.
+    case monitor
+    /// Wood veneer, as domestic sets were finished into the eighties.
+    case woodgrain
+    /// Black plastic, the portable set of the nineties.
+    case black
+
+    public var displayName: String {
+        switch self {
+        case .monitor: "Studio monitor"
+        case .woodgrain: "Wood veneer"
+        case .black: "Black portable"
+        }
+    }
+
+    public var detail: String {
+        switch self {
+        case .monitor: "Neutral grey, the colour of edit-suite equipment."
+        case .woodgrain: "Wood veneer, the way a console set in a living room was finished."
+        case .black: "Moulded black plastic, the portable set of the nineties."
+        }
+    }
+}
+
 /// Scanline overlay density. Thickness is derived from the output scale at draw
 /// time so the lines never moiré, however far the canvas is scaled up.
 public enum ScanlineMode: String, Codable, Sendable, CaseIterable {
@@ -120,13 +151,27 @@ public final class AppSettings {
         self.defaults = defaults
         units = defaults.decoded(Key.units, default: .us)
         layoutMode = defaults.decoded(Key.layoutMode, default: .auto)
+        // The retro treatment is the point of the app on a handheld, where the screen is
+        // close to the eye and the tube reads as intended. A Mac window and an Apple TV
+        // are both looked at from further away and are more often left running in the
+        // corner of a room, so those stay clean unless asked otherwise.
+        #if os(iOS)
+        scanlines = defaults.decoded(Key.scanlines, default: .medium)
+        #else
         scanlines = defaults.decoded(Key.scanlines, default: .off)
+        #endif
         speed = defaults.decoded(Key.speed, default: .normal)
         storedRefreshMinutes = min(max(defaults.value(forKey: Key.refreshMinutes) as? Int ?? 10, 5), 60)
         clockSeconds = defaults.bool(forKey: Key.clockSeconds, default: true)
         // No capability check here: an unsupported GPU is handled by the render path
         // falling back to the drawn overlay, so a stored `.tube` costs nothing.
+        #if os(iOS)
+        screenEffect = defaults.decoded(Key.screenEffect, default: .tube)
+        #else
         screenEffect = defaults.decoded(Key.screenEffect, default: .plain)
+        #endif
+        televisionFinish = defaults.decoded(Key.televisionFinish, default: .monitor)
+        televisionInLandscape = defaults.bool(Key.televisionInLandscape, default: false)
         // Defaults on only for Apple TV. A television is the panel at risk of burn-in and
         // the device most likely to be left showing this for hours; nudging a phone or a
         // Mac window around would be noise for no benefit.
@@ -167,6 +212,17 @@ public final class AppSettings {
 
     public var units: UnitSystem { didSet { defaults.encode(units, Key.units) } }
     public var layoutMode: LayoutMode { didSet { defaults.encode(layoutMode, Key.layoutMode) } }
+    public var televisionFinish: TelevisionFinish {
+        didSet { defaults.encode(televisionFinish, Key.televisionFinish) }
+    }
+    /// Whether the cabinet is also drawn on a screen wider than it is tall.
+    ///
+    /// Off by default, because landscape is the shape the picture was drawn for and
+    /// filling the screen with it is the better default. On, the set appears in both
+    /// orientations for anyone who wants the object rather than the picture.
+    public var televisionInLandscape: Bool {
+        didSet { defaults.set(televisionInLandscape, forKey: Key.televisionInLandscape) }
+    }
     public var scanlines: ScanlineMode { didSet { defaults.encode(scanlines, Key.scanlines) } }
     public var speed: PlaybackSpeed { didSet { defaults.encode(speed, Key.speed) } }
     public var clockSeconds: Bool { didSet { defaults.set(clockSeconds, forKey: Key.clockSeconds) } }
@@ -315,6 +371,8 @@ private enum Key {
 
     static let units = prefix + "units"
     static let layoutMode = prefix + "layoutMode"
+    static let televisionFinish = prefix + "televisionFinish"
+    static let televisionInLandscape = prefix + "televisionInLandscape"
     static let scanlines = prefix + "scanlines"
     static let speed = prefix + "speed"
     static let refreshMinutes = prefix + "refreshMinutes"
@@ -356,6 +414,11 @@ public struct SavedLocation: Codable, Sendable, Hashable, Identifiable {
 extension UserDefaults {
     fileprivate func bool(forKey key: String, default fallback: Bool) -> Bool {
         object(forKey: key) as? Bool ?? fallback
+    }
+
+    /// Same as above; the label reads better at the call sites that pass a key constant.
+    fileprivate func bool(_ key: String, default fallback: Bool) -> Bool {
+        bool(forKey: key, default: fallback)
     }
 
     fileprivate func decoded<T: Decodable>(_ key: String, default fallback: T) -> T {

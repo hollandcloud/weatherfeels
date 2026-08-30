@@ -76,12 +76,14 @@ public enum DisplayIdentifier: String, Codable, Sendable, CaseIterable, Identifi
 
     /// Whether the display is in the rotation on a fresh install.
     /// Hourly and Travel are off by default upstream; we keep that.
-    public var isEnabledByDefault: Bool {
-        switch self {
-        case .hourly, .travel, .hourlyGraph, .spcOutlook: false
-        default: true
-        }
-    }
+    /// Every display, on first launch.
+    ///
+    /// Four of these used to start switched off — Hourly, Travel, the hourly graph and the
+    /// SPC outlook — which meant the parts of the rotation someone would most likely enjoy
+    /// finding were the ones they had to know to go looking for. Showing everything and
+    /// letting people prune it is the right way round: the rotation is the product, and
+    /// the settings screen already lists every display with a switch beside it.
+    public var isEnabledByDefault: Bool { true }
 
     /// Displays enabled on first launch.
     public static var defaultEnabled: [DisplayIdentifier] {

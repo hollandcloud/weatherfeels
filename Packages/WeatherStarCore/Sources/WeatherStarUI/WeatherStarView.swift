@@ -11,6 +11,16 @@ public struct WeatherStarView: View {
     /// Width of the resolved design space, for the credit line on the startup screen.
     @State private var metricsWidth: CGFloat = 640
 
+    /// Whether the tube is lit.
+    ///
+    /// The power button on the cabinet blanks the picture the way the one on a real set
+    /// did, rather than quitting: an iOS app terminating itself is both discouraged and
+    /// useless here, and the interesting thing to have is a set that can be switched off
+    /// on a desk without losing where the rotation had got to. The engine keeps running
+    /// behind the dark glass, so switching back on shows current weather rather than a
+    /// stale frame.
+    @State private var isPictureOn = true
+
     /// Current burn-in offset.
     ///
     /// Held in state and updated by a slow loop rather than read from a `TimelineView`:
@@ -94,63 +104,79 @@ public struct WeatherStarView: View {
         return place.map { "\(display) for \($0)" } ?? display
     }
 
-    public init() {}
+    /// Called when the cabinet's leftmost button is pressed.
+    ///
+    /// Settings are presented by `RootView`, which owns that state, so the button can
+    /// only report the press upward.
+    private let onOpenSettings: () -> Void
+
+    public init(onOpenSettings: @escaping () -> Void = {}) {
+        self.onOpenSettings = onOpenSettings
+    }
+
+    /// The cabinet to draw, or `nil` to run the picture edge to edge.
+    ///
+    /// Always on a screen meaningfully taller than it is wide, where the picture cannot
+    /// fill it anyway; in landscape only if asked for, since there the picture can. An
+    /// explicit layout choice is taken at face value either way — someone who picks
+    /// Portrait wants the tall canvas, not a television showing a 4:3 one.
+    private func television(container: CGSize) -> TelevisionGeometry? {
+        guard settings.layoutMode == .auto else { return nil }
+        guard container.width > 0, container.height > 0 else { return nil }
+        let isPortrait = container.height > container.width * 1.05
+        guard isPortrait || settings.televisionInLandscape else { return nil }
+        return TelevisionGeometry.resolve(
+            container: container,
+            pictureAspect: DesignSpace.standard.aspectRatio
+        )
+    }
 
     public var body: some View {
         GeometryReader { proxy in
-            let space = DesignSpace.resolve(for: settings.layoutMode, container: proxy.size)
-            let metrics = StarMetrics(space: space, container: proxy.size)
+            let set = television(container: proxy.size)
+            // Inside a cabinet the picture is always the authentic 4:3 canvas, sized to
+            // the glass. Everywhere else it still fills whatever it is given.
+            let space = set == nil
+                ? DesignSpace.resolve(for: settings.layoutMode, container: proxy.size)
+                : .standard
+            let metrics = StarMetrics(space: space, container: set?.screenSize ?? proxy.size)
 
-            // A ZStack already centres its children, so `metrics.origin` — the
-            // letterbox offset — must *not* be applied on top of that: doing so shifted
-            // the canvas right and down by the full letterbox amount instead of half.
-            // It went unnoticed on Apple TV, where the wide canvas exactly fills a 16:9
-            // screen and the origin is zero, but pushed the layout off-centre on a
-            // taller phone.
-            ZStack {
-                Color.black
-
-                // The canvas and its scanlines shift together. Offsetting only the canvas
-                // would slide the content out from under a fixed line pattern, which reads
-                // as the picture tearing rather than as a still image.
-                ZStack {
-                    IconAnimationClock {
-                        canvas(metrics: metrics)
-                            .environment(\.starMetrics, metrics)
-                    }
-
-                    // Both shader paths draw their own lines, so the overlay would double
-                    // them up — and for the tube it would curve one set and not the other,
-                    // since the shader keys its mask off the face of the glass.
-                    if usesDrawnOverlay {
-                        Scanlines(
-                            mode: settings.scanlines,
-                            animated: settings.screenEffect == .animated
+            Group {
+                if let set {
+                    StarTelevision(
+                        geometry: set,
+                        finish: settings.televisionFinish,
+                        controls: TelevisionControls(
+                            isPictureOn: isPictureOn,
+                            onSettings: onOpenSettings,
+                            onPrevious: { engine.previousDisplay() },
+                            onNext: { engine.nextDisplay() },
+                            onPower: { isPictureOn.toggle() }
                         )
-                        .environment(\.starMetrics, metrics)
-                        .frame(width: metrics.scaledSize.width, height: metrics.scaledSize.height)
+                    ) {
+                        picture(metrics: metrics, size: set.screenSize)
+                            .frame(width: set.screenSize.width, height: set.screenSize.height)
+                            // A tube switching off: the raster collapses to a bright line
+                            // and goes out. The brightness lift is what sells it — a plain
+                            // fade reads as a dimmer, not as losing the high voltage.
+                            .scaleEffect(y: isPictureOn ? 1 : 0.004, anchor: .center)
+                            .brightness(isPictureOn ? 0 : 0.55)
+                            .opacity(isPictureOn ? 1 : 0)
+                            .animation(.easeInOut(duration: 0.28), value: isPictureOn)
+                            .background(Color.black)
+                    }
+                } else {
+                    // A ZStack already centres its children, so `metrics.origin` — the
+                    // letterbox offset — must *not* be applied on top of that: doing so
+                    // shifted the canvas right and down by the full letterbox amount
+                    // instead of half. It went unnoticed on Apple TV, where the wide canvas
+                    // exactly fills a 16:9 screen and the origin is zero, but pushed the
+                    // layout off-centre on a taller phone.
+                    ZStack {
+                        Color.black
+                        picture(metrics: metrics, size: proxy.size)
                     }
                 }
-                // Collapsed into a single accessibility element.
-                //
-                // A device profile put ~44% of all main-thread time in
-                // `AccessibilityViewGraph.needsUpdate`, and 37% in
-                // `AccessibilityNode.visibility.getter` alone — SwiftUI rebuilding an
-                // accessibility attachment for every node on every display-link tick. The
-                // displays are decorative pixel art built from thousands of views, because
-                // `StarText` alone is six per label, so that tree is enormous and none of it
-                // is useful to a screen reader glyph by glyph. Ignoring the children stops
-                // the walk; the label below keeps the screen described.
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(accessibilitySummary)
-                .offset(x: burnInOffset.x, y: burnInOffset.y)
-                // Opaque before the shader samples it. A layer with transparent regions
-                // makes every per-channel read a premultiplied one, and the tube has to
-                // guess at alpha it cannot reconstruct; giving it a solid picture removes
-                // the question. The outer black is still there for the letterbox.
-                .background(Color.black)
-                .crtEffect(tubeSettings(metrics: metrics), size: proxy.size)
-                .scanlineEffect(shaderLineSettings, size: proxy.size)
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
             .onAppear {
@@ -165,6 +191,56 @@ public struct WeatherStarView: View {
         .ignoresSafeArea()
         .background(Color.black)
         .task(id: settings.burnInProtection) { await driveBurnInShift() }
+    }
+
+    /// The picture: canvas, scanlines, burn-in shift and the tube, as one image.
+    ///
+    /// Factored out so it can be hosted either edge to edge or inside `StarTelevision`.
+    /// `size` is the area the shaders sample, which is the glass when there is a cabinet
+    /// and the whole window when there is not — passing the window in both cases put the
+    /// tube's curvature and vignette around the room instead of around the picture.
+    private func picture(metrics: StarMetrics, size: CGSize) -> some View {
+        // The canvas and its scanlines shift together. Offsetting only the canvas
+        // would slide the content out from under a fixed line pattern, which reads
+        // as the picture tearing rather than as a still image.
+        ZStack {
+            IconAnimationClock {
+                canvas(metrics: metrics)
+                    .environment(\.starMetrics, metrics)
+            }
+
+            // Both shader paths draw their own lines, so the overlay would double
+            // them up — and for the tube it would curve one set and not the other,
+            // since the shader keys its mask off the face of the glass.
+            if usesDrawnOverlay {
+                Scanlines(
+                    mode: settings.scanlines,
+                    animated: settings.screenEffect == .animated
+                )
+                .environment(\.starMetrics, metrics)
+                .frame(width: metrics.scaledSize.width, height: metrics.scaledSize.height)
+            }
+        }
+        // Collapsed into a single accessibility element.
+        //
+        // A device profile put ~44% of all main-thread time in
+        // `AccessibilityViewGraph.needsUpdate`, and 37% in
+        // `AccessibilityNode.visibility.getter` alone — SwiftUI rebuilding an
+        // accessibility attachment for every node on every display-link tick. The
+        // displays are decorative pixel art built from thousands of views, because
+        // `StarText` alone is six per label, so that tree is enormous and none of it
+        // is useful to a screen reader glyph by glyph. Ignoring the children stops
+        // the walk; the label below keeps the screen described.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilitySummary)
+        .offset(x: burnInOffset.x, y: burnInOffset.y)
+        // Opaque before the shader samples it. A layer with transparent regions
+        // makes every per-channel read a premultiplied one, and the tube has to
+        // guess at alpha it cannot reconstruct; giving it a solid picture removes
+        // the question. The outer black is still there for the letterbox.
+        .background(Color.black)
+        .crtEffect(tubeSettings(metrics: metrics), size: size)
+        .scanlineEffect(shaderLineSettings, size: size)
     }
 
     /// Step the burn-in offset on a wall-clock schedule.

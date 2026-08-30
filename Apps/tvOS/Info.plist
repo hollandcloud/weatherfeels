@@ -32,6 +32,8 @@
 	</array>
 	<key>UIUserInterfaceStyle</key>
 	<string>Dark</string>
+	<key>WS4KLogoLines</key>
+	<string>WEATHER|FEELS</string>
 	<key>WS4KStartupSubtitle</key>
 	<string></string>
 	<key>WS4KStartupTitle</key>
