@@ -138,6 +138,27 @@ public struct SettingsView: View {
                 }
             }
 
+            // Only does anything on a portrait screen, and saying so is cheaper than
+            // leaving someone to wonder why the picker appears to be inert.
+            Picker("Television", selection: bind(\.televisionFinish)) {
+                ForEach(TelevisionFinish.allCases, id: \.self) { finish in
+                    Text(finish.displayName).tag(finish)
+                }
+            }
+            Text(settings.televisionFinish.detail)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            Toggle("Show the television in landscape", isOn: bind(\.televisionInLandscape))
+            Text(
+                """
+                The cabinet always appears when the screen is upright, where the picture \
+                cannot fill it. Turn this on to keep the set in both orientations.
+                """
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+
             Picker("Scanlines", selection: bind(\.scanlines)) {
                 ForEach(ScanlineMode.allCases, id: \.self) { mode in
                     Text(mode.displayName).tag(mode)

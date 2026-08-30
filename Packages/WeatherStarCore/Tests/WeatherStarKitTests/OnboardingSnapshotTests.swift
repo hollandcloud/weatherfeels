@@ -246,4 +246,115 @@ struct OnboardingLocationTests {
         #expect(LocationStepStage(hasAnsweredAuthorization: true).showsPlaceSearch)
     }
 }
+
+/// Every onboarding foreground, measured against the gradient it is drawn on.
+///
+/// Onboarding is the one screen that paints its own background instead of sitting on a
+/// system one, so nothing about its contrast is guaranteed by the platform. It was
+/// shipped with `.secondary` body copy and a default-tinted Toggle label, both of which
+/// resolve *dark* under a light system appearance and became near-invisible on the navy
+/// gradient. The view now states every colour explicitly; this is what holds it there.
+///
+/// A render test could not catch it: `ImageRenderer` ignores `preferredColorScheme`, so
+/// it cannot reproduce the light-appearance case that was broken. The colours themselves
+/// are exact numbers, so they are checked as numbers.
+@Suite("Onboarding contrast")
+struct OnboardingPaletteTests {
+    /// WCAG 2.1 relative luminance, from the sRGB components.
+    private static func luminance(_ color: Color) -> Double {
+        let resolved = NSColor(color).usingColorSpace(.sRGB)!
+        func channel(_ value: CGFloat) -> Double {
+            let v = Double(value)
+            return v <= 0.03928 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * channel(resolved.redComponent)
+            + 0.7152 * channel(resolved.greenComponent)
+            + 0.0722 * channel(resolved.blueComponent)
+    }
+
+    /// WCAG 2.1 contrast ratio, 1:1 to 21:1.
+    private static func ratio(_ a: Color, _ b: Color) -> Double {
+        let first = luminance(a)
+        let second = luminance(b)
+        return (max(first, second) + 0.05) / (min(first, second) + 0.05)
+    }
+
+    /// Both ends of the gradient, because a foreground has to survive the whole run of
+    /// it — the top is the lighter end and therefore the harder case for light text.
+    private static let backgrounds: [(String, Color)] = [
+        ("gradient top", StarColor.backgroundTop),
+        ("gradient bottom", StarColor.backgroundBottom),
+    ]
+
+    @Test("Text colours clear 4.5:1 against the gradient")
+    func textContrast() {
+        let foregrounds: [(String, Color)] = [
+            ("title", OnboardingPalette.title),
+            ("body", OnboardingPalette.body),
+            ("accent", OnboardingPalette.accent),
+            ("warning", OnboardingPalette.warning),
+        ]
+        for (backgroundName, background) in Self.backgrounds {
+            for (name, foreground) in foregrounds {
+                let value = Self.ratio(foreground, background)
+                #expect(
+                    value >= 4.5,
+                    "\(name) on \(backgroundName) is \(value):1 — under the 4.5:1 floor"
+                )
+            }
+        }
+    }
+
+    /// The primary action is a filled shape, so it has two jobs: its label has to read on
+    /// the fill, and the fill has to read as a control against the gradient. The accent
+    /// blue it used to carry failed the first (3.65:1) and only scraped the second.
+    @Test("The primary action reads both against its label and against the gradient")
+    func actionContrast() {
+        let label = Self.ratio(OnboardingPalette.actionLabel, OnboardingPalette.actionFill)
+        #expect(label >= 4.5, "action label on its fill is \(label):1")
+
+        for (backgroundName, background) in Self.backgrounds {
+            let value = Self.ratio(OnboardingPalette.actionFill, background)
+            // 3:1 is WCAG's floor for a non-text UI component boundary.
+            #expect(
+                value >= 3,
+                "action fill on \(backgroundName) is \(value):1 — the button loses its edge"
+            )
+        }
+    }
+
+    /// The specific regression: a colour that changes with the system appearance cannot
+    /// be reasoned about here at all, so the palette must not contain one. `.secondary`
+    /// and `.primary` resolve differently per appearance; an opaque literal does not.
+    @Test("Palette colours are appearance-independent")
+    func palettePinsItsColours() {
+        let all: [(String, Color)] = [
+            ("title", OnboardingPalette.title),
+            ("body", OnboardingPalette.body),
+            ("accent", OnboardingPalette.accent),
+            ("warning", OnboardingPalette.warning),
+            ("actionFill", OnboardingPalette.actionFill),
+            ("actionLabel", OnboardingPalette.actionLabel),
+        ]
+        for (name, color) in all {
+            // `performAsCurrentDrawingAppearance` returns Void, so the resolved value has
+            // to be carried out of the block rather than returned from it.
+            var light: NSColor!
+            var dark: NSColor!
+            NSAppearance(named: .aqua)!.performAsCurrentDrawingAppearance {
+                light = NSColor(color).usingColorSpace(.sRGB)!
+            }
+            NSAppearance(named: .darkAqua)!.performAsCurrentDrawingAppearance {
+                dark = NSColor(color).usingColorSpace(.sRGB)!
+            }
+            #expect(
+                abs(light.redComponent - dark.redComponent) < 0.001
+                    && abs(light.greenComponent - dark.greenComponent) < 0.001
+                    && abs(light.blueComponent - dark.blueComponent) < 0.001
+                    && abs(light.alphaComponent - dark.alphaComponent) < 0.001,
+                "\(name) changes with the system appearance: \(light!) vs \(dark!)"
+            )
+        }
+    }
+}
 #endif

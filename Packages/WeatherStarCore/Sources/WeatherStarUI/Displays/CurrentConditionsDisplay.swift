@@ -117,13 +117,33 @@ struct CurrentConditionsDisplay: View {
     }
 
     private func row(_ label: String, _ value: String) -> some View {
+        // Both sides condense rather than overprint. On the 640pt canvas the column is
+        // 255pt, and "Pressure:" beside "30.04 in.hg" needs more than that — the spacer
+        // collapsed to nothing and the two ran straight through each other. The reading
+        // holds its size first, because a squeezed label is still readable and a squeezed
+        // number is the thing someone is here for.
         HStack(spacing: 0) {
-            StarText(label, font: .large, size: 20)
-                .designOffset(x: Layout.labelIndent)
+            StarText(label, font: .large, size: 20, lineLimit: 1, minimumScaleFactor: 0.55)
             Spacer(minLength: 0)
-            StarText(value, font: .large, size: 20, alignment: .trailing)
-                .designOffset(x: -Layout.valueInset)
+            StarText(
+                value,
+                font: .large,
+                size: 20,
+                alignment: .trailing,
+                lineLimit: 1,
+                minimumScaleFactor: 0.8
+            )
+            // The reading holds its size and the label gives way, because a condensed
+            // label is still readable and a condensed number is what someone is here for.
+            .layoutPriority(1)
         }
+        // Padding, not `designOffset`. The indents used to be offsets, which translate a
+        // view *after* layout: the row was laid out across the full column and then the
+        // two halves were slid 30pt towards each other, so "Pressure:" and "30.04 in.hg"
+        // overprinted however they were sized. As padding the width is really reserved,
+        // which is what lets the spacer and the scale factors do their job.
+        .designPadding(.leading, Layout.labelIndent)
+        .designPadding(.trailing, Layout.valueInset)
         .designFrame(width: columnWidth)
         .designPadding(.bottom, Layout.rowSpacing)
     }

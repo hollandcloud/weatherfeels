@@ -191,9 +191,12 @@ struct HourlyDisplay: View {
         static let wind: CGFloat = 505
         static let rowHeight: CGFloat = 72
         static let iconWidth: CGFloat = 70
-        /// Runs to the right edge. Upstream's 100pt box could not hold a
-        /// three-letter direction plus a two-digit speed ("NNW 15" needs 115pt).
-        static let windWidth: CGFloat = 135
+        /// Upstream's 100pt box could not hold a three-letter direction plus a two-digit
+        /// speed ("NNW 15" needs 115pt), so this is wider — but not the 135pt it was,
+        /// which ended at exactly 640 and put the final digit hard against the canvas
+        /// edge. Anything that frames the picture, a television bezel included, took a
+        /// bite out of it there.
+        static let windWidth: CGFloat = 120
     }
 
     /// Height of the scrolling viewport, below the header and above the ticker.

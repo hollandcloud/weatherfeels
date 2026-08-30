@@ -39,14 +39,40 @@ let repoRoot: String = {
 
 // MARK: - Fonts
 
-/// Register the bundled Star4000 faces so the wordmark uses the app's own type.
-func registerFonts() {
-    let directory = "\(repoRoot)/Packages/WeatherStarCore/Sources/WeatherStarResources/Resources/Fonts"
-    let names = (try? FileManager.default.contentsOfDirectory(atPath: directory)) ?? []
-    for name in names where name.hasSuffix(".ttf") {
-        let url = URL(fileURLWithPath: "\(directory)/\(name)")
-        CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+/// The face the wordmark is set in.
+///
+/// Deliberately *not* one of the bundled Star4000 faces. All four are the light,
+/// wide-spaced letterforms of a 1990 character generator: they are right on screen, where
+/// they are the picture, and wrong on an icon, where the mark has to hold together at
+/// 40 points on a home screen. A bold condensed grotesque is what a broadcast logo of the
+/// period was actually set in, and it matches the corner badge the app draws — see
+/// `StarLogoBadge` in `StarBranding.swift`, which resolves the same list.
+///
+/// This also replaces a `registerFonts()` that pointed at
+/// `WeatherStarResources/Resources/Fonts`, a directory that does not exist — the assets
+/// live under `Assets/Fonts`. So the registration silently did nothing, `STAR4` never
+/// resolved, and every icon shipped so far was drawn in whatever CoreText fell back to.
+let wordmarkFont: String = {
+    for name in ["HelveticaNeue-CondensedBold", "HelveticaNeue-Bold", "Helvetica-Bold"] {
+        let font = CTFontCreateWithName(name as CFString, 12, nil)
+        if (CTFontCopyPostScriptName(font) as String) == name { return name }
     }
+    return "Helvetica-Bold"
+}()
+
+/// The lines on the plate. Two, since the rename.
+let wordmarkLines = ["WEATHER", "FEELS"]
+
+/// Width of `string` in the wordmark face at `size`.
+func wordmarkWidth(_ string: String, size: CGFloat) -> CGFloat {
+    let font = CTFontCreateWithName(wordmarkFont as CFString, size, nil)
+    let attributed = NSAttributedString(
+        string: string,
+        attributes: [kCTFontAttributeName as NSAttributedString.Key: font]
+    )
+    return CGFloat(CTLineGetTypographicBounds(
+        CTLineCreateWithAttributedString(attributed), nil, nil, nil
+    ))
 }
 
 // MARK: - Drawing
@@ -136,12 +162,12 @@ func drawBackground(_ context: CGContext, _ width: CGFloat, _ height: CGFloat) {
     context.restoreGState()
 }
 
-/// The "WEATHER STAR 4000+" plate, matching the corner logo on the displays.
+/// The "WEATHER FEELS" plate, matching the corner logo on the displays.
 func drawWordmark(_ context: CGContext, _ width: CGFloat, _ height: CGFloat) {
-    let plateWidth = width * 0.60
-    let plateHeight = height * 0.44
+    let plateWidth = width * 0.62
+    let plateHeight = height * 0.40
     let x = (width - plateWidth) / 2
-    let y = height * 0.15
+    let y = height * 0.17
 
     let rect = CGRect(x: x, y: y, width: plateWidth, height: plateHeight)
     let radius = plateHeight * 0.14
@@ -156,14 +182,29 @@ func drawWordmark(_ context: CGContext, _ width: CGFloat, _ height: CGFloat) {
     context.addPath(plate)
     context.strokePath()
 
-    let size = plateHeight * 0.26
+    // One size for both lines, set by whichever constraint binds first — the longest line
+    // against the plate's width, or the stack of cap heights against its height. The same
+    // rule the on-screen badge uses, so the icon and the corner mark are the same object.
+    let inset = plateWidth * 0.08
+    let probe: CGFloat = 100
+    let widest = wordmarkLines.map { wordmarkWidth($0, size: probe) }.max() ?? probe
+    let capHeight = CTFontGetCapHeight(CTFontCreateWithName(wordmarkFont as CFString, probe, nil))
+
+    let widthLimited = (plateWidth - inset * 2) / widest * probe
+    let heightLimited = (plateHeight - inset * 1.6) / (capHeight * 1.25 * CGFloat(wordmarkLines.count)) * probe
+    let size = min(widthLimited, heightLimited)
+
     let centerX = width / 2
-    drawText(context, "WEATHER", centerX: centerX, centerY: y + plateHeight * 0.75,
-             size: size, font: "STAR4", color: white)
-    drawText(context, "STAR", centerX: centerX, centerY: y + plateHeight * 0.48,
-             size: size, font: "STAR4", color: white)
-    drawText(context, "4000+", centerX: centerX, centerY: y + plateHeight * 0.21,
-             size: size, font: "STAR4", color: white)
+    let step = capHeight / probe * size * 1.25
+    // Centre the block, then step down through the lines from its top.
+    let firstCenter = y + plateHeight / 2 + step * (CGFloat(wordmarkLines.count) - 1) / 2
+    for (index, line) in wordmarkLines.enumerated() {
+        drawText(
+            context, line,
+            centerX: centerX, centerY: firstCenter - step * CGFloat(index),
+            size: size, font: wordmarkFont, color: white
+        )
+    }
 }
 
 func flatIcon(_ width: Int, _ height: Int) -> CGContext {
@@ -337,9 +378,9 @@ func buildTopShelf(_ path: String, _ width: Int, _ height: Int) {
         let context = makeContext(pixelWidth, pixelHeight)
         drawBackground(context, CGFloat(pixelWidth), CGFloat(pixelHeight))
         drawText(
-            context, "WEATHER STAR 4000+",
+            context, wordmarkLines.joined(separator: " "),
             centerX: CGFloat(pixelWidth) / 2, centerY: CGFloat(pixelHeight) * 0.42,
-            size: CGFloat(pixelHeight) * 0.17, font: "STAR4", color: white
+            size: CGFloat(pixelHeight) * 0.17, font: wordmarkFont, color: white
         )
         return context
     }
@@ -385,7 +426,6 @@ func buildTVOS() -> String {
 
 // MARK: - Entry point
 
-registerFonts()
 print("iOS   -> \(buildiOS())")
 print("macOS -> \(buildMacOS())")
 print("tvOS  -> \(buildTVOS())")

@@ -36,6 +36,36 @@ enum LocationStepStage: Equatable {
     var showsPlaceSearch: Bool { self == .placePicker }
 }
 
+/// The colours onboarding draws its own text and controls in.
+///
+/// Stated explicitly, and named rather than left inline, because onboarding sits on the
+/// WeatherStar blue gradient instead of on a system background. Anything left to resolve
+/// from the system appearance — `.secondary`, `.primary`, an untinted button's accent —
+/// comes out *dark* in light mode, and the gradient is dark whatever the appearance is.
+/// That is what made the music step's body copy and the Toggle's label unreadable.
+///
+/// Every value here is opaque, so the contrast against the gradient is a fixed number
+/// rather than something that depends on what it happens to be composited over.
+/// `OnboardingPaletteTests` checks each one against both ends of the gradient.
+enum OnboardingPalette {
+    /// Headings, bullet text, control labels.
+    static let title = Color.white
+    /// Body copy. Dimmer than `title` but still well clear of the 4.5:1 floor.
+    static let body = Color(white: 0.78)
+    /// The bullet checkmarks. Pinned rather than `.green`, which shifts with appearance.
+    static let accent = Color(red: 0.30, green: 0.85, blue: 0.45)
+    /// Errors and the "location is off" notice. Pinned for the same reason as `accent`.
+    static let warning = Color(red: 1.00, green: 0.72, blue: 0.30)
+    /// Fill for the one primary action on each step.
+    ///
+    /// Amber rather than the accent blue: a blue button on the navy gradient separates
+    /// from its background by only 3.7:1, and white on it lands at 3.65:1 — under the
+    /// floor for the body-sized "Continue". Amber clears both comfortably.
+    static let actionFill = Color(red: 1.00, green: 0.72, blue: 0.00)
+    /// Label on `actionFill`. Black, because the fill is a light colour.
+    static let actionLabel = Color.black
+}
+
 public struct OnboardingView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(LocationService.self) private var locationService
@@ -89,6 +119,17 @@ public struct OnboardingView: View {
                 .frame(maxWidth: 820)
                 .padding(.horizontal, 32)
         }
+        // Pinned dark at the *presentation* level, for the reason `RootView` records on
+        // the settings sheet: setting `EnvironmentValues.colorScheme` alone only tells
+        // SwiftUI's own drawing, while the platform keeps deriving control chrome — a
+        // text field's fill, a focus highlight, a switch's track — from the real
+        // UIKit/AppKit appearance. On a device in light mode that left dark chrome and
+        // dark default labels on top of this gradient.
+        .preferredColorScheme(.dark)
+        // Plain and bordered buttons take their label colour from the tint. Left at the
+        // accent it is blue-on-blue here; white reads against the gradient. The two
+        // primary actions override this locally.
+        .tint(OnboardingPalette.title)
     }
 
     @ViewBuilder
@@ -106,7 +147,7 @@ public struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 24) {
             Text(Step.welcome.title)
                 .font(.largeTitle.bold())
-                .foregroundStyle(.white)
+                .foregroundStyle(OnboardingPalette.title)
             Text(
                 """
                 A native recreation of The Weather Channel's WeatherStar 4000, \
@@ -114,7 +155,7 @@ public struct OnboardingView: View {
                 """
             )
             .font(.title3)
-            .foregroundStyle(.white.opacity(0.75))
+            .foregroundStyle(OnboardingPalette.body)
 
             VStack(alignment: .leading, spacing: 12) {
                 bullet("Local forecasts, radar, almanac and hazards on a rotating loop")
@@ -124,9 +165,13 @@ public struct OnboardingView: View {
 
             Spacer()
 
-            Button("Get Started") { step = .location }
-                .buttonStyle(.borderedProminent)
-                .font(.title3)
+            Button { step = .location } label: {
+                Text("Get Started")
+                    .foregroundStyle(OnboardingPalette.actionLabel)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(OnboardingPalette.actionFill)
+            .font(.title3)
         }
         .padding(.vertical, 48)
     }
@@ -134,8 +179,8 @@ public struct OnboardingView: View {
     private func bullet(_ text: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-            Text(text).foregroundStyle(.white)
+                .foregroundStyle(OnboardingPalette.accent)
+            Text(text).foregroundStyle(OnboardingPalette.title)
         }
         .font(.body)
     }
@@ -150,7 +195,7 @@ public struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 20) {
             Text(Step.location.title)
                 .font(.largeTitle.bold())
-                .foregroundStyle(.white)
+                .foregroundStyle(OnboardingPalette.title)
 
             switch stage {
             case .permissionPrompt: permissionPrompt
@@ -178,7 +223,7 @@ public struct OnboardingView: View {
                 """
             )
             .font(.callout)
-            .foregroundStyle(.white.opacity(0.75))
+            .foregroundStyle(OnboardingPalette.body)
 
             Button {
                 continueToPermissionPrompt()
@@ -188,14 +233,16 @@ public struct OnboardingView: View {
                     if isResolvingLocation { ProgressView().padding(.leading, 4) }
                 }
                 .frame(maxWidth: .infinity)
+                .foregroundStyle(OnboardingPalette.actionLabel)
             }
             .buttonStyle(.borderedProminent)
+            .tint(OnboardingPalette.actionFill)
             .disabled(isResolvingLocation)
 
             if let locationError {
                 Text(locationError)
                     .font(.footnote)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(OnboardingPalette.warning)
             }
 
             Spacer()
@@ -208,12 +255,12 @@ public struct OnboardingView: View {
             if locationService.isDenied {
                 Text("Location access is off. Search for a place instead.")
                     .font(.footnote)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(OnboardingPalette.warning)
             }
 
             Text("Search for a place")
                 .font(.headline)
-                .foregroundStyle(.white)
+                .foregroundStyle(OnboardingPalette.title)
 
             HStack {
                 // tvOS has no bordered text field style; its fields already present
@@ -239,7 +286,7 @@ public struct OnboardingView: View {
             if let locationError {
                 Text(locationError)
                     .font(.footnote)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(OnboardingPalette.warning)
 
                 // Only a retry, and only once access is already granted, so it cannot
                 // produce a permission prompt however it is labelled.
@@ -344,7 +391,7 @@ public struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 20) {
             Text(Step.music.title)
                 .font(.largeTitle.bold())
-                .foregroundStyle(.white)
+                .foregroundStyle(OnboardingPalette.title)
             Text(
                 """
                 The app ships with four instrumental tracks. You can add your own \
@@ -353,25 +400,35 @@ public struct OnboardingView: View {
                 """
             )
             .font(.callout)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(OnboardingPalette.body)
 
             // `.switch` only reaches tvOS in 18.0; the default style is a switch on
             // every other platform anyway.
-            #if os(tvOS)
-            Toggle("Play music behind the displays", isOn: musicEnabledBinding)
-            #else
-            Toggle("Play music behind the displays", isOn: musicEnabledBinding)
-                .toggleStyle(.switch)
-            #endif
+            Group {
+                #if os(tvOS)
+                Toggle("Play music behind the displays", isOn: musicEnabledBinding)
+                #else
+                Toggle("Play music behind the displays", isOn: musicEnabledBinding)
+                    .toggleStyle(.switch)
+                #endif
+            }
+            // The label would otherwise be `.primary`, and the switch's on-track the
+            // accent — the two things on this step that were hardest to read.
+            .foregroundStyle(OnboardingPalette.title)
+            .tint(OnboardingPalette.actionFill)
 
             Spacer()
 
             HStack {
                 Button("Back") { step = .location }
                 Spacer()
-                Button("Start Watching") { finish() }
-                    .buttonStyle(.borderedProminent)
-                    .font(.title3)
+                Button { finish() } label: {
+                    Text("Start Watching")
+                        .foregroundStyle(OnboardingPalette.actionLabel)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(OnboardingPalette.actionFill)
+                .font(.title3)
             }
         }
         .padding(.vertical, 48)

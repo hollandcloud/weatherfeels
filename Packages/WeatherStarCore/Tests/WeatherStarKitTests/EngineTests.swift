@@ -258,12 +258,16 @@ struct DisplayIdentifierTests {
         #expect(DisplayIdentifier.extendedForecast.rawValue == "extended-forecast")
     }
 
-    @Test("Hourly and Travel stay off by default, as upstream has them")
-    func defaultsMatchUpstream() {
-        #expect(!DisplayIdentifier.hourly.isEnabledByDefault)
-        #expect(!DisplayIdentifier.travel.isEnabledByDefault)
-        #expect(DisplayIdentifier.currentWeather.isEnabledByDefault)
-        #expect(DisplayIdentifier.almanac.isEnabledByDefault)
+    /// Deliberately diverges from upstream, which ships Hourly, Travel, the hourly graph
+    /// and the SPC outlook switched off. Here the whole rotation runs on first launch and
+    /// the settings screen is where it gets pruned — the displays are the product, and the
+    /// four that were hidden are the ones a new user would most enjoy coming across.
+    @Test("Every display is in the rotation on a fresh install")
+    func everyDisplayStartsEnabled() {
+        for display in DisplayIdentifier.allCases {
+            #expect(display.isEnabledByDefault, "\(display) is not enabled by default")
+        }
+        #expect(DisplayIdentifier.defaultEnabled.count == DisplayIdentifier.allCases.count)
     }
 
     @Test("Hazards is drawn without header or ticker")

@@ -39,14 +39,26 @@ display, which means it is in all 23 screenshots. An icon reading WEATHER STAR 4
 under a name chosen to avoid it defeats the point of the rename, and the icon is the most
 visible surface there is: search results, product page, and the device itself.
 
-**Decided: the badge stays as it is.** Kevin's call, made with the trade-off in front of
-him. So the position going into review is a name that avoids the mark, a description that
-never uses it except to disclaim, and artwork that still shows it. If that draws a
-5.2.1 rejection or a complaint later, the badge is the thing to change, and it is not
-much work: `Tools/MakeIcons.swift` draws it from three lines of text, the corner logo
-already has the `WS4KLogoImageName` hook, and the screenshot harness can re-shoot the set
-in about twenty minutes. A generated `WS4KP / NOSTALGIA` alternative has been rendered and
-checked once already, so that route is proven if it is ever wanted.
+**Resolved in 1.1: the badge no longer carries the mark.** It reads `WEATHER / FEELS`,
+on the app icon and on the corner logo of every display, so the rename is now complete
+across the name, the listing copy and the artwork alike.
+
+Both come from text rather than from a checked-in image:
+
+- The corner badge is drawn by `StarLogoBadge` in `StarBranding.swift`, from the
+  `WS4KLogoLines` key in each `Apps/<platform>/Info.plist` (`WEATHER|FEELS`). A fork sets
+  its own there, or supplies real artwork through the older `WS4KLogoImageName` hook.
+- The app icon is drawn by `Tools/MakeIcons.swift`, from `wordmarkLines` in that file.
+
+Neither is set in a Star4000 face. All four of those are the light, wide-spaced
+letterforms of a character generator — right on screen, where they *are* the picture, and
+far too thin for a mark that has to hold together at icon size. Both use a bold condensed
+grotesque instead, which is what a broadcast logo of the period was set in and what the
+original badge artwork itself used.
+
+The screenshots were re-shot for all four platforms at the same time; `Tools/shoot.sh` and
+`Tools/shoot-mac.sh` do that in about twenty minutes. Anything that changes on-screen
+artwork needs the same treatment, or the store page stops matching the app.
 
 Being free and open source helps the underlying position considerably: it puts this in
 the same posture as `ws4kp` itself, whose defence is that it is "a free, non-profit work

@@ -203,6 +203,53 @@ struct DisplaySnapshotTests {
         #expect(image.width == 3840)
     }
 
+    /// Every label/value pair on Current Conditions, measured against the column it has.
+    ///
+    /// This is the display's tightest layout and it was broken in the shipped 1.0: the
+    /// 20pt label indent and 10pt value inset were applied with `designOffset`, which
+    /// translates a view after layout rather than reserving space. The row was laid out
+    /// across the full column and then its two halves slid 30pt towards each other, so on
+    /// the 640pt canvas "Pressure:" and "30.04 in.hg" printed straight through one
+    /// another. It reached the App Store that way, in the iPad screenshots.
+    ///
+    /// Measured with the real font rather than rendered and eyeballed, because that is the
+    /// only way to know it holds for the longest strings and not merely for today's weather.
+    @Test("Every Current Conditions row fits its column")
+    func currentConditionsRowsFit() {
+        StarFontLoader.registerFonts()
+
+        // The 640pt canvas — the narrow one, used on iPad and inside the television.
+        let column: CGFloat = 255
+        let available = column - 20 - 10  // labelIndent, valueInset
+        let size: CGFloat = 20
+        // The value keeps its size; only the label is allowed to condense.
+        let labelFloor: CGFloat = 0.55
+
+        // The longest realistic string for each row, including both apparent-temperature
+        // labels and the units that make the values widest.
+        let rows = [
+            ("Humidity:", "100%"),
+            ("Dewpoint:", "-15°"),
+            ("Ceiling:", "Unlimited"),
+            ("Visibility:", "10 mi."),
+            ("Pressure:", "30.04 in.hg"),
+            ("Heat Index:", "108°"),
+            ("Wind Chill:", "-25°"),
+        ]
+
+        for (label, value) in rows {
+            let labelWidth = StarFont.large.textWidth(label, size: size) * labelFloor
+            let valueWidth = StarFont.large.textWidth(value, size: size)
+            #expect(
+                labelWidth + valueWidth <= available,
+                """
+                "\(label) \(value)" needs \(labelWidth + valueWidth)pt of \(available)pt \
+                even with the label fully condensed — it will overprint
+                """
+            )
+        }
+    }
+
     @Test("Almanac fits its columns inside the canvas")
     func almanac() throws {
         let days = (0..<4).map { offset in
