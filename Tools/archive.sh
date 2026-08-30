@@ -44,6 +44,24 @@ destination_for() {
   esac
 }
 
+# Automatic signing needs an authenticated account to create or refresh a profile.
+# Xcode's own Accounts pane is one way; the other is the same App Store Connect API key
+# used for uploading, which is what a machine with no Xcode sign-in has. Without it,
+# `-allowProvisioningUpdates` fails with "No Accounts: Add a new account in Accounts
+# settings" — which reads like a project problem and is not one.
+AUTH_ARGS=()
+KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID:-}.p8"
+if [ -n "${ASC_KEY_ID:-}" ] && [ -n "${ASC_ISSUER_ID:-}" ] && [ -f "$KEY_PATH" ]; then
+  AUTH_ARGS=(
+    -authenticationKeyPath "$KEY_PATH"
+    -authenticationKeyID "$ASC_KEY_ID"
+    -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+  )
+  echo "Signing with App Store Connect key $ASC_KEY_ID"
+else
+  echo "No ASC API key in the environment; relying on Xcode's Accounts pane for signing."
+fi
+
 mkdir -p "$BUILD_DIR"
 
 # App Store distribution for all three. macOS goes to the Mac App Store rather than
@@ -90,6 +108,7 @@ archive_one() {
       -configuration Release \
       -archivePath "$archive" \
       -allowProvisioningUpdates \
+      "${AUTH_ARGS[@]}" \
       >"$log" 2>&1; then
     echo "FAIL archive $platform (see $log)"
     return 1
@@ -100,6 +119,7 @@ archive_one() {
       -exportOptionsPlist "$BUILD_DIR/ExportOptions.plist" \
       -exportPath "$export_dir" \
       -allowProvisioningUpdates \
+      "${AUTH_ARGS[@]}" \
       >>"$log" 2>&1; then
     echo "FAIL export $platform (see $log)"
     return 1
