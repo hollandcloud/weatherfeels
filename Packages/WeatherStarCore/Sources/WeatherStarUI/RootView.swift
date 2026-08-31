@@ -19,6 +19,18 @@ public struct RootView: View {
 
     @Environment(\.scenePhase) private var scenePhase
 
+    /// Whether the television is switched on.
+    ///
+    /// The power button on the cabinet blanks the picture and silences the music the way
+    /// the one on a real set did, rather than quitting: an iOS app terminating itself is
+    /// both discouraged and useless here, and the interesting thing to have is a set that
+    /// can be switched off on a desk without losing where the rotation had got to.
+    ///
+    /// The rotation itself keeps running behind the dark glass, so switching back on shows
+    /// current weather rather than a stale frame. That is the one way this differs from
+    /// backgrounding the app, which stops the engine as well.
+    @State private var isPictureOn = true
+
     @State private var isShowingSettings = false
     @State private var isShowingControls = false
     /// Whether music was playing when the app went to the background, so it can be
@@ -114,7 +126,11 @@ public struct RootView: View {
             }
             #endif
 
-            WeatherStarView(onOpenSettings: { isShowingSettings = true })
+            WeatherStarView(
+                isPictureOn: isPictureOn,
+                onOpenSettings: { isShowingSettings = true },
+                onPower: togglePower
+            )
 
             if isShowingControls {
                 ControlsOverlay(
@@ -287,7 +303,7 @@ public struct RootView: View {
     }
 
     private func applyMusicState() {
-        if settings.musicEnabled {
+        if MusicGate.shouldPlay(musicEnabled: settings.musicEnabled, isSetOn: isPictureOn) {
             musicPlayer.play()
         } else {
             musicPlayer.pause()
@@ -296,6 +312,17 @@ public struct RootView: View {
 
     private func toggleMusic() {
         settings.musicEnabled.toggle()
+    }
+
+    /// The cabinet's power button: the picture and the sound together.
+    ///
+    /// `musicEnabled` is deliberately left alone. It is the user's standing preference, and
+    /// standby is a gate on top of it — switching the set off must not read as switching
+    /// music off, or switching it back on would leave the music silent while Settings still
+    /// said it was enabled.
+    private func togglePower() {
+        isPictureOn.toggle()
+        applyMusicState()
     }
 
     /// Stop the music and the rotation when the app is no longer on screen.
@@ -308,8 +335,10 @@ public struct RootView: View {
         case .active:
             engine.isPlaying = true
             setIdleTimerDisabled(true)
-            if wasPlayingBeforeBackground, settings.musicEnabled {
-                musicPlayer.play()
+            // Through `applyMusicState` rather than `play()` directly, so returning to a
+            // set that was switched off does not start the music up again.
+            if wasPlayingBeforeBackground {
+                applyMusicState()
             }
             wasPlayingBeforeBackground = false
         case .inactive, .background:

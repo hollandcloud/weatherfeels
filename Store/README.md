@@ -13,7 +13,11 @@ Store/
       promotional_text.txt      170             — 149
       keywords.txt              100             — 77
       description.txt           4000            — 3061
-      release_notes.txt         4000            — what changed in this version
+      release_notes.txt         4000            — what changed, for any platform with no
+                                                file of its own below
+      release_notes-IOS.txt     4000            — what changed, per platform. `asc.py text`
+      release_notes-TV_OS.txt   4000              prefers these and falls back to the
+      release_notes-MAC_OS.txt  4000              shared file above
       support_url.txt           docs/support.md in this repo
       privacy_policy_url.txt    docs/privacy.md in this repo
       marketing_url.txt         the repo itself

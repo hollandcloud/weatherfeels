@@ -15,10 +15,6 @@ forecast follows the device; decline, and the same screen becomes a search field
 for choosing a US city by name or ZIP code. Nothing in the app is gated on
 granting access, and the app never asks again after the first answer.
 
-This addresses the 5.1.1(iv) rejection of 20 August. The previous build's button
-read "Use this device's location" and sat beside a "Skip" that deferred the
-request; both are gone.
-
 FORECASTS ARE UNITED STATES ONLY. Weather comes from the US National Weather
 Service, which only covers US locations. If you are reviewing from outside the
 United States, please pick a US city so the displays have data: open Settings,
@@ -29,8 +25,19 @@ HOW TO REACH SETTINGS
 
 • Apple TV: swipe up on the remote to bring up the controls, then select the gear.
   The first row of Settings is "Close Settings".
-• iPhone / iPad: tap anywhere to bring up the controls, then tap the gear.
+• iPhone / iPad: tap anywhere to bring up the controls, then tap the gear. Held
+  upright, the picture is drawn on a television and the gear is the first of the
+  four buttons on the front of the cabinet, below the screen.
 • Mac: Command-comma, or tap for the controls.
+
+NEW IN THIS VERSION: THE TELEVISION. On a screen taller than it is wide, the
+picture is drawn on a CRT standing in a dark room rather than stretched up the
+screen. On iPhone and iPad that is portrait; on a Mac it is any window taller than
+it is wide. The four buttons on the cabinet are, left to right: Settings, previous
+display, next display, and a power button that switches the picture and the music
+off together and darkens the lamp beside it. The power button does not quit the
+app; pressing it again brings both back. The app opens in landscape, where the picture fills the screen as
+it did before, and rotates freely from there.
 
 MUSIC IS OPTIONAL AND OFF BY DEFAULT. The Apple Music source plays a playlist
 from the reviewer's own library and needs an active Apple Music subscription; if
@@ -65,10 +72,14 @@ project netbymatt/ws4kp (MIT licence).
 | Attachment | none needed |
 | Age rating | 4+ — see `age-rating.md` |
 
-## Reply to send in App Store Connect
+## Historical: the reply sent for the 1.0 rejection
 
-Submission 736a60ac-8426-4a48-bd6a-6420b1f2c161, guideline 5.1.1(iv). Paste as a
-reply on that message when the new build is attached.
+Kept as a record, not as a task. Submission 736a60ac-8426-4a48-bd6a-6420b1f2c161,
+guideline 5.1.1(iv), was answered with the text below and 1.0 went on sale. The
+reviewer notes above no longer mention that rejection: pointing a reviewer of a
+later version at a resolved complaint against a shipped one invites a second look
+at something already settled. The substance — that location is optional and the
+prompt is never deferred — is still in the notes on its own merits.
 
 ---
 

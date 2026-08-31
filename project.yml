@@ -41,12 +41,12 @@ settings:
   base:
     WS4K_BUNDLE_ID: net.hlnd.weatherstar
     WS4K_TEAM_ID: 2KD5ZL97LH
-    MARKETING_VERSION: "1.1"
+    MARKETING_VERSION: "1.1.1"
     # Date-based — YYYYMMDD.N — and it only ever goes up: App Store Connect rejects any
     # build not strictly higher than the last one it saw. The build reviewed on 20 August
     # was 20260817.1; 20260826.1 followed it. Bump the N suffix for a second build on the
     # same day rather than reusing one.
-    CURRENT_PROJECT_VERSION: "20260830.1"
+    CURRENT_PROJECT_VERSION: "20260830.2"
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     CODE_SIGN_STYLE: Automatic
