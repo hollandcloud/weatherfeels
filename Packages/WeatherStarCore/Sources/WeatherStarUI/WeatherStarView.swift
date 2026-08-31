@@ -11,16 +11,6 @@ public struct WeatherStarView: View {
     /// Width of the resolved design space, for the credit line on the startup screen.
     @State private var metricsWidth: CGFloat = 640
 
-    /// Whether the tube is lit.
-    ///
-    /// The power button on the cabinet blanks the picture the way the one on a real set
-    /// did, rather than quitting: an iOS app terminating itself is both discouraged and
-    /// useless here, and the interesting thing to have is a set that can be switched off
-    /// on a desk without losing where the rotation had got to. The engine keeps running
-    /// behind the dark glass, so switching back on shows current weather rather than a
-    /// stale frame.
-    @State private var isPictureOn = true
-
     /// Current burn-in offset.
     ///
     /// Held in state and updated by a slow loop rather than read from a `TimelineView`:
@@ -104,14 +94,31 @@ public struct WeatherStarView: View {
         return place.map { "\(display) for \($0)" } ?? display
     }
 
+    /// Whether the tube is lit.
+    ///
+    /// Owned by `RootView` rather than held here, because switching the set off is no
+    /// longer only about the picture — it silences the music too, and the music player is
+    /// `RootView`'s. Passed down as a value: this view draws the state, it does not decide
+    /// it.
+    private let isPictureOn: Bool
+
     /// Called when the cabinet's leftmost button is pressed.
     ///
     /// Settings are presented by `RootView`, which owns that state, so the button can
     /// only report the press upward.
     private let onOpenSettings: () -> Void
 
-    public init(onOpenSettings: @escaping () -> Void = {}) {
+    /// Called when the cabinet's power button is pressed.
+    private let onPower: () -> Void
+
+    public init(
+        isPictureOn: Bool = true,
+        onOpenSettings: @escaping () -> Void = {},
+        onPower: @escaping () -> Void = {}
+    ) {
+        self.isPictureOn = isPictureOn
         self.onOpenSettings = onOpenSettings
+        self.onPower = onPower
     }
 
     /// The cabinet to draw, or `nil` to run the picture edge to edge.
@@ -151,7 +158,7 @@ public struct WeatherStarView: View {
                             onSettings: onOpenSettings,
                             onPrevious: { engine.previousDisplay() },
                             onNext: { engine.nextDisplay() },
-                            onPower: { isPictureOn.toggle() }
+                            onPower: onPower
                         )
                     ) {
                         picture(metrics: metrics, size: set.screenSize)

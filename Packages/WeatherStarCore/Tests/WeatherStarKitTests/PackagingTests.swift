@@ -599,6 +599,43 @@ struct SettingsTests {
         #expect(settings.remoteMusicURL != nil)
     }
 
+    /// The television's power button, against what it is supposed to silence.
+    ///
+    /// This shipped wrong: the button blanked the picture and left the music playing, so a
+    /// set that plainly looked switched off carried on making noise. The rule has more than
+    /// one caller — the power button, the music toggle, and returning from the background —
+    /// and the bug was one of them disagreeing with the others, which is exactly the kind of
+    /// thing a named rule and four assertions prevent coming back.
+    @Test("Music plays only when it is enabled and the set is on")
+    func musicGate() {
+        #expect(MusicGate.shouldPlay(musicEnabled: true, isSetOn: true))
+        // The case that was broken.
+        #expect(!MusicGate.shouldPlay(musicEnabled: true, isSetOn: false))
+        #expect(!MusicGate.shouldPlay(musicEnabled: false, isSetOn: true))
+        #expect(!MusicGate.shouldPlay(musicEnabled: false, isSetOn: false))
+    }
+
+    /// Switching the set off must not look like switching music off.
+    ///
+    /// Standby gates `musicEnabled`; it never writes to it. If it did, turning the set back
+    /// on would leave the music silent while Settings still read "on" — and the preference
+    /// would be quietly lost every time someone used the power button.
+    @Test("Standby leaves the music preference alone")
+    func standbyDoesNotClearThePreference() {
+        let (settings, defaults) = makeSettings()
+        settings.musicEnabled = true
+
+        // What `togglePower` does: flip the set, re-apply the rule. Nothing writes back.
+        var isSetOn = true
+        for _ in 0..<3 {
+            isSetOn.toggle()
+            _ = MusicGate.shouldPlay(musicEnabled: settings.musicEnabled, isSetOn: isSetOn)
+        }
+
+        #expect(settings.musicEnabled)
+        #expect(AppSettings(defaults: defaults).musicEnabled)
+    }
+
     @Test("Toggling a display in the rotation persists")
     func displayToggles() {
         let (settings, defaults) = makeSettings()
