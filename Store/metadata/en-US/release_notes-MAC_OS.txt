@@ -1,17 +1,3 @@
-Make the window taller than it is wide and the forecast plays on a television.
-
-• The set. A window in portrait shows the picture on a CRT rather than letterboxing it.
-  Its buttons work: settings, back and forward through the rotation, and a power button
-  that switches the tube off the way it used to.
-• Three finishes. Studio monitor grey, wood veneer, or black plastic. There is also a
-  switch to keep the set in a wide window.
-• The whole rotation, by default. Hourly Forecast, Travel, the hourly graph and the
-  severe-weather outlook used to start switched off. Everything is on now; turn off what
-  you do not want in Settings.
-• A new app icon and on-screen mark.
-
-Fixed
-• Current Conditions printed its labels through its readings in a narrow window —
-  "Pressure:" and the reading beside it ran into each other.
-• The first-run screens had text that came out dark on the blue background under a light
-  appearance, and was close to unreadable.
+• Switching the television off now silences the music as well as the picture. The power
+  button on the cabinet used to blank the screen and leave the music playing, so a set
+  that plainly looked switched off carried on making noise.

@@ -10,6 +10,7 @@ Needs an App Store Connect API key with App Manager rights:
 Then:
 
     Tools/asc.py status                   # what ASC currently has. Run this first.
+    Tools/asc.py version 1.1.1            # open a new version once the last one is on sale
     Tools/asc.py text                     # name, subtitle, description, keywords, URLs
                                           # release notes come from
                                           # release_notes-<PLATFORM>.txt where present
@@ -17,6 +18,7 @@ Then:
     Tools/asc.py review                   # App Review contact details and notes
     Tools/asc.py agerating                # the questionnaire, all answers "none"
     Tools/asc.py attach [build]           # point the editable versions at a build
+                                          # (defaults to CURRENT_PROJECT_VERSION)
     Tools/asc.py submit                   # put them in front of App Review
     Tools/asc.py all
 
@@ -512,6 +514,14 @@ def push_age_rating() -> None:
         print(f"  appInfo {info['id']}: {len(remaining)} answers set{note}")
 
 
+def project_build_version() -> str | None:
+    """`CURRENT_PROJECT_VERSION` from project.yml — the build this tree produces."""
+    match = re.search(
+        r'CURRENT_PROJECT_VERSION:\s*"([^"]+)"', (ROOT / "project.yml").read_text()
+    )
+    return match.group(1) if match else None
+
+
 def latest_build(app: str, platform: str, version: str | None = None) -> dict | None:
     """The newest processed build for one platform, or a named one.
 
@@ -538,8 +548,20 @@ def latest_build(app: str, platform: str, version: str | None = None) -> dict | 
 
 
 def attach_build(version: str | None = None) -> None:
-    """Point each editable version at a processed build of its own platform."""
+    """Point each editable version at the build this working tree produced.
+
+    Defaulting to `CURRENT_PROJECT_VERSION` rather than to whatever uploaded most recently,
+    because "most recent" is wrong in the one case that matters. Apple processes the three
+    platforms at their own pace, so minutes after an upload the newest *processed* build for
+    a platform can still be the previous release's — and that one is already attached to a
+    version on sale, so ASC refuses it with "The specified pre-release build could not be
+    added". The failure at least made itself known here; the same fallback silently
+    attaching a superseded build to a new version would not have.
+    """
     app = app_id()
+    version = version or project_build_version()
+    if version:
+        print(f"  attaching build {version}")
     waiting = []
 
     for platform, version_id in editable_versions().items():
@@ -549,7 +571,7 @@ def attach_build(version: str | None = None) -> None:
             # process an upload, and the three platforms finish at their own pace. Report
             # and carry on, so the ones that are ready get attached.
             waiting.append(platform)
-            print(f"  {platform}: no processed build yet")
+            print(f"  {platform}: build {version or 'latest'} has not finished processing")
             continue
 
         call(
@@ -744,6 +766,52 @@ def push_screenshots() -> None:
                 upload_one(set_id, image)
 
 
+def create_version(version_string: str) -> None:
+    """Open a new App Store version on every platform that does not have one.
+
+    The last step of a release that was not scripted. Once a version goes on sale its
+    listing is frozen, so `editable_versions()` finds nothing and every other command here
+    has nothing to write to — which looks like the tool being broken rather than the app
+    simply having shipped.
+
+    Safe to re-run: a platform that already has this version, editable or not, is left
+    alone rather than being sent a duplicate.
+    """
+    app = app_id()
+    existing = {}
+    for version in call(
+        "GET",
+        f"/v1/apps/{app}/appStoreVersions?limit=200"
+        "&fields[appStoreVersions]=platform,versionString,appStoreState",
+    )["data"]:
+        attributes = version["attributes"]
+        existing.setdefault((attributes["platform"], attributes["versionString"]), version)
+
+    for platform in PLATFORMS:
+        if (platform, version_string) in existing:
+            state = existing[(platform, version_string)]["attributes"]["appStoreState"]
+            print(f"  {platform}: {version_string} already exists ({state})")
+            continue
+
+        created = call(
+            "POST",
+            "/v1/appStoreVersions",
+            {
+                "data": {
+                    "type": "appStoreVersions",
+                    "attributes": {
+                        "platform": platform,
+                        "versionString": version_string,
+                    },
+                    "relationships": {
+                        "app": {"data": {"type": "apps", "id": app}}
+                    },
+                }
+            },
+        )["data"]
+        print(f"  {platform}: created {version_string} ({created['id']})")
+
+
 def main() -> None:
     command = sys.argv[1] if len(sys.argv) > 1 else "status"
     if command == "status":
@@ -756,6 +824,10 @@ def main() -> None:
         push_review()
     elif command == "agerating":
         push_age_rating()
+    elif command == "version":
+        if len(sys.argv) < 3:
+            sys.exit("usage: asc.py version <version-string>")
+        create_version(sys.argv[2])
     elif command == "attach":
         attach_build(sys.argv[2] if len(sys.argv) > 2 else None)
     elif command == "submit":

@@ -34,9 +34,9 @@ NEW IN THIS VERSION: THE TELEVISION. On a screen taller than it is wide, the
 picture is drawn on a CRT standing in a dark room rather than stretched up the
 screen. On iPhone and iPad that is portrait; on a Mac it is any window taller than
 it is wide. The four buttons on the cabinet are, left to right: Settings, previous
-display, next display, and a power button that blanks the picture and lights the
-lamp beside it. The power button does not quit the app; pressing it again brings
-the picture back. The app opens in landscape, where the picture fills the screen as
+display, next display, and a power button that switches the picture and the music
+off together and darkens the lamp beside it. The power button does not quit the
+app; pressing it again brings both back. The app opens in landscape, where the picture fills the screen as
 it did before, and rotates freely from there.
 
 MUSIC IS OPTIONAL AND OFF BY DEFAULT. The Apple Music source plays a playlist
