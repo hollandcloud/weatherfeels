@@ -351,12 +351,35 @@ struct TableHeaderTests {
         return pixels
     }
 
+    /// How far a single colour channel may move before it counts as the header changing.
+    ///
+    /// This comparison used to be byte-exact, and failed about one full run in five —
+    /// passing whenever the suite was run on its own, which is the worst way for a test to
+    /// be wrong. Measuring an actual failure settled what the differences were: 113 pixels
+    /// out of half a million, every one of them inside the TEMP/LIKE/WIND glyphs, and none
+    /// off by more than a single intensity level. That is text antialiasing, which is not
+    /// promised to be reproducible run to run, and not the header moving.
+    ///
+    /// The regression this test exists to catch — a scrolling row drawn over the titles —
+    /// puts thousands of pixels wrong by more than a hundred levels, so a tolerance this
+    /// small gives up nothing that matters.
+    private static let rasterisationTolerance = 8
+
+    /// The largest single-channel difference between two bands.
+    private static func largestDifference(_ first: [UInt8], _ second: [UInt8]) -> Int {
+        guard first.count == second.count else { return 255 }
+        var worst = 0
+        for index in first.indices where index % 4 != 3 {
+            worst = max(worst, abs(Int(first[index]) - Int(second[index])))
+        }
+        return worst
+    }
+
     @Test("Scrolling the rows leaves the header untouched")
     func headerIsUnaffectedByScrolling() throws {
         // Discarded: the first render in a process can land before Core Text has picked
         // up the registered Star4000 faces, so its glyphs are missing and it is not a
-        // sound reference. Which render is first depends on the order the suites happen
-        // to run in, so without this the test passes or fails by luck.
+        // sound reference.
         _ = render(0)
 
         // Offsets across a whole row's travel, including the point where a row's text
@@ -368,8 +391,13 @@ struct TableHeaderTests {
             let scrolled = try #require(render(offset))
             // Compared through a Bool on purpose: handing the arrays themselves to
             // `#expect` puts ~28MB of pixel values in the failure message.
-            let unchanged = headerPixels(scrolled) == reference
-            #expect(unchanged, "the header changed once the rows moved to \(offset)")
+            // Compared through a number on purpose: handing the arrays themselves to
+            // `#expect` puts ~28MB of pixel values in the failure message.
+            let worst = Self.largestDifference(reference, headerPixels(scrolled))
+            #expect(
+                worst <= Self.rasterisationTolerance,
+                "the header changed by \(worst) once the rows moved to \(offset)"
+            )
         }
     }
 
