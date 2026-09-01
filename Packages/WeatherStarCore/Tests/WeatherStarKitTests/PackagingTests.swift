@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Testing
 import WeatherStarResources
@@ -233,6 +234,31 @@ struct PackagingTests {
         #expect(tracks.allSatisfy { $0.source == .bundled })
         // Titles come from the filename with the extension stripped.
         #expect(tracks.contains { $0.title == "Crisp day" })
+    }
+
+    /// Every effect `SoundEffects` can play has a file behind it.
+    ///
+    /// `SoundEffects` logs and carries on when an asset is missing, which is right for the
+    /// display loop — a silent power button beats a crash — and exactly why it needs a
+    /// test. Renaming or dropping a `.wav` would make the feature quietly stop working
+    /// with nothing to notice it. The enum's raw values *are* the filenames, so this walks
+    /// `allCases` rather than repeating the names and going stale.
+    @Test("Every CRT sound effect has a bundled file")
+    func soundEffectsPresent() {
+        for effect in SoundEffects.Effect.allCases {
+            let url = WeatherStarResources.url("\(effect.rawValue).wav", in: .sounds)
+            #expect(url != nil, "no bundled file for \(effect.rawValue)")
+            guard let url else { continue }
+
+            // Decoded, not just present. A truncated or mis-generated WAV passes a size
+            // check and then plays nothing, which is the failure this is guarding.
+            let player = try? AVAudioPlayer(contentsOf: url)
+            #expect(player != nil, "\(effect.rawValue).wav did not decode")
+            #expect(
+                (player?.duration ?? 0) > 0.1,
+                "\(effect.rawValue).wav decoded to \(player?.duration ?? 0)s"
+            )
+        }
     }
 
     @Test("The radar and regional base maps are present")

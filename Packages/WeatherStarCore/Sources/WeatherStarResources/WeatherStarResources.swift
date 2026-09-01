@@ -17,6 +17,7 @@ public enum WeatherStarResources {
         case maps = "Maps"
         case data = "Data"
         case music = "Music"
+        case sounds = "Sounds"
     }
 
     /// Resource lookup goes through `Bundle` rather than string-concatenating onto

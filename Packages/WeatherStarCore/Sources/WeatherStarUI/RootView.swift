@@ -15,6 +15,7 @@ public struct RootView: View {
     @State private var locationService: LocationService
     @State private var musicLibrary: MusicLibrary
     @State private var musicPlayer: MusicPlayer
+    @State private var soundEffects = SoundEffects()
     @State private var transfer: MusicTransfer
 
     @Environment(\.scenePhase) private var scenePhase
@@ -137,6 +138,7 @@ public struct RootView: View {
                     isPlaying: engine.isPlaying,
                     trackTitle: musicPlayer.currentTrackTitle,
                     isMusicPlaying: musicPlayer.isPlaying,
+                    isPictureOn: isPictureOn,
                     onPlayPause: { engine.isPlaying.toggle() },
                     onPrevious: { engine.previousDisplay() },
                     onNext: { engine.nextDisplay() },
@@ -145,6 +147,7 @@ public struct RootView: View {
                         hideControls()
                         isShowingSettings = true
                     },
+                    onPower: togglePower,
                     onDismiss: hideControls,
                     onInteraction: showControls
                 )
@@ -322,6 +325,9 @@ public struct RootView: View {
     /// said it was enabled.
     private func togglePower() {
         isPictureOn.toggle()
+        // Before the music state, so the thump lands with the picture rather than after
+        // the music has already stopped.
+        soundEffects.play(isPictureOn ? .powerOn : .powerOff)
         applyMusicState()
     }
 
@@ -400,17 +406,27 @@ struct ControlsOverlay: View {
     @FocusState private var focusedControl: Control?
 
     private enum Control: Hashable {
-        case previous, playPause, next, music, settings
+        case previous, playPause, next, music, settings, power
     }
 
     let isPlaying: Bool
     let trackTitle: String
     let isMusicPlaying: Bool
+    /// Whether the television is on, for the power control's icon.
+    let isPictureOn: Bool
     let onPlayPause: () -> Void
     let onPrevious: () -> Void
     let onNext: () -> Void
     let onToggleMusic: () -> Void
     let onSettings: () -> Void
+    /// Switches the set off and on.
+    ///
+    /// The cabinet has a power button of its own, but it is unreachable on Apple TV: the
+    /// focus engine never gets the d-pad, because `weatherScreen`'s one-point button
+    /// consumes it to move between displays. Putting power here — the surface that is
+    /// already focusable, and the only one the remote can reach — is what makes standby
+    /// work on a television at all.
+    let onPower: () -> Void
     let onDismiss: () -> Void
     /// Fired on any remote movement, so the host can restart its idle timer.
     var onInteraction: () -> Void = {}
@@ -433,6 +449,8 @@ struct ControlsOverlay: View {
                     .focused($focusedControl, equals: .music)
                 button("gearshape.fill", action: onSettings)
                     .focused($focusedControl, equals: .settings)
+                button(isPictureOn ? "power" : "power.circle", action: onPower)
+                    .focused($focusedControl, equals: .power)
             }
             #if os(tvOS)
             // Land focus on Settings, since that is what the overlay mostly exists for.
