@@ -183,20 +183,51 @@ struct HourlyDisplay: View {
     /// Vertical scroll offset in design points, driven by the engine's base count.
     let scrollOffset: Double
 
-    fileprivate enum Column {
-        static let hour: CGFloat = 25
-        static let icon: CGFloat = 255
-        static let temperature: CGFloat = 355
-        static let apparent: CGFloat = 425
-        static let wind: CGFloat = 505
+    /// Column x positions, which differ between the standard and wide canvases.
+    ///
+    /// The wide canvas insets the 640pt content block by 107pt, which carries every column
+    /// clear of the blue panel drawn behind it. The standard canvas has no such inset, so
+    /// the wide numbers ran the hour label off the panel's left edge and the wind value off
+    /// its right, onto the orange field either side — visible in the shipped 1.1 iPad
+    /// screenshots. The standard set is placed inside the panel (52…584), which is what
+    /// Latest Observations already does and Travel already happens to satisfy.
+    ///
+    /// Positions only, not sizes: the type stays 32pt on both canvases. The room comes from
+    /// the gap after the hour label, which was far wider than the longest label needs.
+    struct Columns: Equatable {
+        let hour: CGFloat
+        let icon: CGFloat
+        let temperature: CGFloat
+        let apparent: CGFloat
+        let wind: CGFloat
+        /// Upstream's 100pt box could not hold a three-letter direction plus a two-digit
+        /// speed ("NNW 15" needs 115pt), so this is wider.
+        let windWidth: CGFloat
+        /// The headers do not sit exactly on their columns.
+        let temperatureHeader: CGFloat
+        let apparentHeader: CGFloat
+        let windHeader: CGFloat
+
+        static let standard = Columns(
+            hour: 64, icon: 200, temperature: 310, apparent: 380, wind: 456,
+            windWidth: 120,
+            temperatureHeader: 310, apparentHeader: 380, windHeader: 470
+        )
+
+        static let wide = Columns(
+            hour: 25, icon: 255, temperature: 355, apparent: 425, wind: 505,
+            windWidth: 120,
+            temperatureHeader: 355, apparentHeader: 435, windHeader: 535
+        )
+    }
+
+    enum Layout {
         static let rowHeight: CGFloat = 72
         static let iconWidth: CGFloat = 70
-        /// Upstream's 100pt box could not hold a three-letter direction plus a two-digit
-        /// speed ("NNW 15" needs 115pt), so this is wider — but not the 135pt it was,
-        /// which ended at exactly 640 and put the final digit hard against the canvas
-        /// edge. Anything that frames the picture, a television bezel included, took a
-        /// bite out of it there.
-        static let windWidth: CGFloat = 120
+    }
+
+    private var columns: Columns {
+        metrics.space.mode == .wide ? .wide : .standard
     }
 
     /// Height of the scrolling viewport, below the header and above the ticker.
@@ -211,11 +242,11 @@ struct HourlyDisplay: View {
                 .designFrame(width: contentWidth, height: TableHeader.bandHeight)
 
             StarText("TEMP", font: .small, size: 32, color: StarColor.columnHeaderText)
-                .designPosition(x: Column.temperature, y: TableHeader.textY)
+                .designPosition(x: columns.temperatureHeader, y: TableHeader.textY)
             StarText("LIKE", font: .small, size: 32, color: StarColor.columnHeaderText)
-                .designPosition(x: 435, y: TableHeader.textY)
+                .designPosition(x: columns.apparentHeader, y: TableHeader.textY)
             StarText("WIND", font: .small, size: 32, color: StarColor.columnHeaderText)
-                .designPosition(x: 535, y: TableHeader.textY)
+                .designPosition(x: columns.windHeader, y: TableHeader.textY)
 
             // Rasterised once, then translated. Scrolling changes only the offset, but
             // these rows are ~24 × 4 labels and `StarText` is six Core Text passes each —
@@ -243,13 +274,13 @@ struct HourlyDisplay: View {
     }
 
     private var rowsView: HourlyRowsView {
-        HourlyRowsView(rows: rows, contentWidth: contentWidth)
+        HourlyRowsView(rows: rows, contentWidth: contentWidth, columns: columns)
     }
 
     /// Total content height, so the parent can compute scroll timing.
     /// Total height of all rows, for the engine's scroll timing.
     static func contentHeight(rowCount: Int) -> CGFloat {
-        CGFloat(rowCount) * Column.rowHeight + 20
+        CGFloat(rowCount) * Layout.rowHeight + 20
     }
 }
 
@@ -334,20 +365,23 @@ struct TravelDisplay: View {
 private struct HourlyRowsView: View, Equatable {
     let rows: [HourlyRow]
     let contentWidth: CGFloat
+    /// Part of the equality on purpose: rotating between canvases changes the layout, and
+    /// a cached raster from the other one would survive the change and look wrong.
+    let columns: HourlyDisplay.Columns
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                let y = CGFloat(index) * HourlyDisplay.Column.rowHeight + 8
+                let y = CGFloat(index) * HourlyDisplay.Layout.rowHeight + 8
 
                 StarText(row.hourLabel, font: .large, size: 32, color: StarColor.title)
-                    .designPosition(x: HourlyDisplay.Column.hour, y: y)
+                    .designPosition(x: columns.hour, y: y)
 
-                PixelImage(row.icon, width: HourlyDisplay.Column.iconWidth)
-                    .designPosition(x: HourlyDisplay.Column.icon, y: y - 6)
+                PixelImage(row.icon, width: HourlyDisplay.Layout.iconWidth)
+                    .designPosition(x: columns.icon, y: y - 6)
 
                 StarText(row.temperature, font: .large, size: 32, color: StarColor.title)
-                    .designPosition(x: HourlyDisplay.Column.temperature, y: y)
+                    .designPosition(x: columns.temperature, y: y)
 
                 StarText(
                     row.apparent,
@@ -357,7 +391,7 @@ private struct HourlyRowsView: View, Equatable {
                         ? StarColor.heatIndex
                         : (row.isWindChill ? StarColor.windChill : StarColor.title)
                 )
-                .designPosition(x: HourlyDisplay.Column.apparent, y: y)
+                .designPosition(x: columns.apparent, y: y)
 
                 StarText(
                     row.wind,
@@ -368,13 +402,13 @@ private struct HourlyRowsView: View, Equatable {
                     lineLimit: 1,
                     minimumScaleFactor: 0.8
                 )
-                .designFrame(width: HourlyDisplay.Column.windWidth, alignment: .trailing)
-                .designPosition(x: HourlyDisplay.Column.wind, y: y)
+                .designFrame(width: columns.windWidth, alignment: .trailing)
+                .designPosition(x: columns.wind, y: y)
             }
         }
         .designFrame(
             width: contentWidth,
-            height: max(CGFloat(rows.count) * HourlyDisplay.Column.rowHeight, 1),
+            height: max(CGFloat(rows.count) * HourlyDisplay.Layout.rowHeight, 1),
             alignment: .topLeading
         )
     }

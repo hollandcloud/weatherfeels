@@ -26,9 +26,6 @@ public struct DesignSpace: Sendable, Hashable {
         mode == .portrait ? 967 : 310
     }
 
-    /// Horizontal inset of the inner "blue box" panel.
-    public var blueBoxMargin: CGFloat { 64 }
-
     /// Content is authored against 640pt regardless of mode; the wide canvas simply
     /// adds margins on either side. This is that margin.
     public var contentInset: CGFloat {
