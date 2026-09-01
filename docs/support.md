@@ -4,7 +4,7 @@ Thanks for using the app. This page is the support contact for the App Store lis
 
 ## Getting help or reporting a bug
 
-Open an issue: **https://github.com/hollandcloud/ws4katv/issues**
+Open an issue: **https://github.com/hollandcloud/weatherfeels/issues**
 
 It helps to include:
 
@@ -52,7 +52,7 @@ your forecast.
 ## Source
 
 The app is open source under the MIT licence at
-**https://github.com/hollandcloud/ws4katv**.
+**https://github.com/hollandcloud/weatherfeels**.
 
 It is an independent tribute to the local forecast units of the 1990s, and is not
 affiliated with, endorsed by, or connected to The Weather Channel or NOAA.

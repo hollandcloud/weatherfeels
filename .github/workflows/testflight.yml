@@ -1,0 +1,140 @@
+name: TestFlight
+
+# Every merge to main becomes a TestFlight build on all three platforms.
+#
+# This stops at the upload. Promoting a build to the App Store — pushing metadata and
+# screenshots, attaching the build to a version, submitting for review — stays a human
+# decision, because a submission is awkward to withdraw and burns a version number each
+# time. Do that with Tools/asc.py, which is what shipped 1.1 and 1.1.1.
+#
+# The marketing version is NOT touched here. TestFlight expects many builds per version,
+# so these all carry whatever MARKETING_VERSION project.yml currently holds and differ only
+# by build number. The version moves when you decide to release.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Which platform(s) to build
+        type: choice
+        default: all
+        options: [all, iOS, tvOS, macOS]
+
+permissions:
+  contents: read
+
+# Queue rather than cancel. Killing a run mid-upload leaves App Store Connect holding a
+# partial build, and every run has its own build number, so there is nothing to win by
+# racing them.
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    name: ${{ matrix.platform }}
+    # GitHub-hosted only, and deliberately not the self-hosted option the sibling iOS repo
+    # offers. That repository is private; this one is public, so a fork's pull request could
+    # otherwise run arbitrary code on our own Mac. The convenience is not worth the trade.
+    runs-on: macos-26
+    # Holds the App Store Connect credentials and is restricted to main by a deployment
+    # branch policy, so no branch and no fork can reach them even by naming the environment.
+    environment: app-store
+    strategy:
+      # One platform failing must not cost the other two: a tvOS signing hiccup should not
+      # take the iOS build down with it.
+      fail-fast: false
+      matrix:
+        platform: >-
+          ${{ fromJSON(
+            (github.event_name == 'workflow_dispatch' && inputs.platform != 'all')
+              && format('["{0}"]', inputs.platform)
+              || '["iOS","tvOS","macOS"]'
+          ) }}
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      # The hosted image does not always carry every platform SDK, and without it the asset
+      # catalog cannot be compiled for that platform.
+      - name: Install the tvOS SDK
+        if: matrix.platform == 'tvOS'
+        run: xcodebuild -downloadPlatform tvOS
+
+      # `archive.sh` reads the key from disk, the way it does on a developer's machine, so
+      # the workflow only has to put it there. 0600 because the runner is shared with
+      # nothing but is worth treating as if it were.
+      - name: Install the App Store Connect key
+        env:
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          printf '%s' "$ASC_KEY_P8_BASE64" | base64 --decode \
+            > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+          chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+
+      # YYYYMMDD.N, matching the convention the repository already uses, and App Store
+      # Connect refuses anything not strictly higher than the last build it saw. The date
+      # rises daily and the run number rises within a day, so the pair always increases.
+      #
+      # Written into project.yml rather than committed: the file stays the source of truth
+      # for a local build, and CI simply never reuses a number a human might also pick.
+      - name: Set the build number
+        id: build
+        run: |
+          BUILD="$(date -u +%Y%m%d).${GITHUB_RUN_NUMBER}"
+          python3 - "$BUILD" <<'PY'
+          import re, sys
+          from pathlib import Path
+          build = sys.argv[1]
+          p = Path("project.yml")
+          text = p.read_text()
+          updated, count = re.subn(
+              r'(CURRENT_PROJECT_VERSION:\s*)"[^"]*"', rf'\1"{build}"', text, count=1
+          )
+          if count != 1:
+              sys.exit("could not find CURRENT_PROJECT_VERSION in project.yml")
+          p.write_text(updated)
+          PY
+          echo "number=$BUILD" >> "$GITHUB_OUTPUT"
+
+      - name: Report what is about to ship
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          BUILD: ${{ steps.build.outputs.number }}
+        run: |
+          echo "platform : $PLATFORM"
+          echo "version  : $(grep -m1 MARKETING_VERSION project.yml | tr -d ' \"' | cut -d: -f2)"
+          echo "build    : $BUILD"
+
+      - name: Regenerate the project
+        run: xcodegen generate
+
+      # Archives, exports and uploads. Signing is automatic and authenticated with the same
+      # App Store Connect key, so there is no certificate or provisioning profile to install
+      # — see the AUTH_ARGS block in the script.
+      - name: Archive and upload
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: ./Tools/archive.sh --upload "$PLATFORM"
+
+      # The logs are public on this repository, so only the build log is kept, and only when
+      # something went wrong. It carries compiler output and paths, not credentials.
+      - name: Keep the build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ matrix.platform }}
+          path: build/${{ matrix.platform }}.log
+          retention-days: 7
+          if-no-files-found: ignore
