@@ -21,7 +21,7 @@ set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
 
-PROJECT=WeatherStar.xcodeproj
+PROJECT=weatherfeels.xcodeproj
 BUILD_DIR=build
 UPLOAD=false
 PLATFORMS=()

@@ -60,7 +60,7 @@ trap cleanup EXIT
 
 echo "building..."
 xcodebuild \
-    -project "$ROOT/WeatherStar.xcodeproj" \
+    -project "$ROOT/weatherfeels.xcodeproj" \
     -scheme "WeatherStar (macOS)" \
     -configuration Release \
     -derivedDataPath "$DERIVED" \

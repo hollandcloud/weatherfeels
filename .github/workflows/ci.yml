@@ -51,7 +51,7 @@ jobs:
 
       - name: Confirm the generated project is buildable
         run: |
-          xcodebuild -project WeatherStar.xcodeproj \
+          xcodebuild -project weatherfeels.xcodeproj \
             -scheme "WeatherStar (iOS)" \
             -configuration Release \
             -destination "generic/platform=iOS" \

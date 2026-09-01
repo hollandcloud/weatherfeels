@@ -136,7 +136,7 @@ xcrun simctl bootstatus "$DEVICE" -b >/dev/null
 
 echo "building..."
 xcodebuild \
-    -project "$ROOT/WeatherStar.xcodeproj" \
+    -project "$ROOT/weatherfeels.xcodeproj" \
     -scheme "$SCHEME" \
     -configuration Release \
     -destination "platform=$SIM_PLATFORM,id=$DEVICE" \
