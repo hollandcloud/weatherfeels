@@ -33,6 +33,13 @@ public struct TelevisionGeometry: Equatable, Sendable {
     public let screenCornerRadius: CGFloat
     /// Edge of the square hit area behind each button.
     public let controlTouchSize: CGFloat
+    /// Space between buttons.
+    ///
+    /// Shrinks when the chin cannot hold five touch targets at the preferred spacing, which
+    /// is the case on the smallest phones. The gap gives way rather than the targets: a
+    /// slightly crowded row is a cosmetic problem, a button under 44pt is one people cannot
+    /// reliably hit.
+    public let controlGap: CGFloat
     /// Whether the chin has room for the speaker once the buttons have taken theirs.
     public let showsSpeaker: Bool
     /// Whether the chin has room for the maker's plate as well.
@@ -52,6 +59,13 @@ public struct TelevisionGeometry: Equatable, Sendable {
     /// phone the chin is around 60pt tall, so a button scaled from it honestly would be
     /// roughly 7pt across — visually right and impossible to hit.
     private static let minimumTouch: CGFloat = 44
+    /// Settings, previous, next, mute, power.
+    ///
+    /// Named because the fitting arithmetic depends on it and the speaker and maker's
+    /// plate are what give way when it grows. Adding a sixth control means checking
+    /// `TelevisionGeometryTests` still passes on a phone, where the touch floor already
+    /// takes most of the chin.
+    static let buttonCount = 5
 
     /// Fit the largest cabinet that leaves the picture at `pictureAspect` and still fits
     /// inside `container` on both axes.
@@ -80,10 +94,14 @@ public struct TelevisionGeometry: Equatable, Sendable {
         // Never below the touch floor, and never taller than the chin it sits in.
         let touch = min(max(minimumTouch, strip * 0.34), strip)
 
-        // What the four buttons and the gaps between them consume, and whether what is
-        // left over is enough for a maker's plate and a speaker as well.
+        // What the buttons and the gaps between them consume, and whether what is left
+        // over is enough for a maker's plate and a speaker as well.
         let chin = screen.width - bezel * 1.2
-        let buttonsWidth = touch * 4 + strip * 0.10 * 3
+        // Preferred spacing, reduced to whatever actually fits.
+        let gaps = CGFloat(buttonCount - 1)
+        let usableChin = chin * 0.99
+        let gap = max(0, min(strip * 0.10, (usableChin - touch * CGFloat(buttonCount)) / gaps))
+        let buttonsWidth = touch * CGFloat(buttonCount) + gap * gaps
         // Seven slots and the gaps between them.
         let speakerWidth = strip * 0.55
         let showsSpeaker = chin - buttonsWidth > strip * 1.1
@@ -104,9 +122,26 @@ public struct TelevisionGeometry: Equatable, Sendable {
             cabinetCornerRadius: screenWidth * 0.052,
             screenCornerRadius: screenWidth * 0.034,
             controlTouchSize: touch,
+            controlGap: gap,
             showsSpeaker: showsSpeaker,
             showsPlate: chin - buttonsWidth - (showsSpeaker ? speakerWidth : 0) > plateWidth
         )
+    }
+}
+
+/// Whether the cabinet is drawn at all.
+///
+/// Named and shared because two places need the same answer and must not drift: the view
+/// that draws the set, and — on tvOS — the focus plumbing that has to stand aside when the
+/// set is there. A disagreement between them is not a visual bug, it is a remote that
+/// cannot reach anything.
+public enum TelevisionPresentation {
+    public static func isShowing(
+        layoutMode: LayoutMode, showsInLandscape: Bool, container: CGSize
+    ) -> Bool {
+        guard layoutMode == .auto, container.width > 0, container.height > 0 else { return false }
+        let isPortrait = container.height > container.width * 1.05
+        return isPortrait || showsInLandscape
     }
 }
 
@@ -117,22 +152,29 @@ public struct TelevisionGeometry: Equatable, Sendable {
 public struct TelevisionControls {
     /// Whether the tube is lit. Drives the indicator beside the power button.
     public var isPictureOn: Bool
+    /// Whether sound is on, for the mute control's icon.
+    public var isSoundOn: Bool
     public var onSettings: () -> Void
     public var onPrevious: () -> Void
     public var onNext: () -> Void
+    public var onToggleSound: () -> Void
     public var onPower: () -> Void
 
     public init(
         isPictureOn: Bool = true,
+        isSoundOn: Bool = true,
         onSettings: @escaping () -> Void = {},
         onPrevious: @escaping () -> Void = {},
         onNext: @escaping () -> Void = {},
+        onToggleSound: @escaping () -> Void = {},
         onPower: @escaping () -> Void = {}
     ) {
         self.isPictureOn = isPictureOn
+        self.isSoundOn = isSoundOn
         self.onSettings = onSettings
         self.onPrevious = onPrevious
         self.onNext = onNext
+        self.onToggleSound = onToggleSound
         self.onPower = onPower
     }
 }
@@ -412,10 +454,15 @@ public struct StarTelevision<Picture: View>: View {
     /// The four controls, in the order a set of the period would have carried them:
     /// menu on the left, the channel pair in the middle, power on the right.
     private var buttons: some View {
-        HStack(spacing: geometry.controlStrip * 0.10) {
+        HStack(spacing: geometry.controlGap) {
             button("gearshape.fill", label: "Settings", action: controls.onSettings)
             button("backward.fill", label: "Previous display", action: controls.onPrevious)
             button("forward.fill", label: "Next display", action: controls.onNext)
+            button(
+                controls.isSoundOn ? "speaker.wave.2.fill" : "speaker.slash.fill",
+                label: controls.isSoundOn ? "Mute" : "Unmute",
+                action: controls.onToggleSound
+            )
             button(
                 "power",
                 label: controls.isPictureOn ? "Turn the picture off" : "Turn the picture on",
@@ -476,7 +523,21 @@ public struct StarTelevision<Picture: View>: View {
                 )
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(TelevisionControlButtonStyle())
+        // Suppress the platform's own focus treatment on tvOS.
+        //
+        // Left to itself tvOS paints a large white rounded-rect wash over whatever holds
+        // focus, which on a button the size of a fingernail swallows the button whole —
+        // and this cabinet is meant to look like moulded plastic, not like a menu. The
+        // style above supplies the focus cue instead: the button swells and brightens the
+        // way a lit control does.
+        //
+        // `RootView` records that this modifier did *not* work on a `.plain` button. It
+        // does work here, because a custom `ButtonStyle` owns its whole appearance rather
+        // than layering on top of a system one.
+        #if os(tvOS)
+        .focusEffectDisabled()
+        #endif
         .accessibilityLabel(label)
     }
 
@@ -496,6 +557,33 @@ public struct StarTelevision<Picture: View>: View {
             )
             .offset(y: geometry.controlStrip * 0.17)
             .animation(.easeInOut(duration: 0.25), value: controls.isPictureOn)
+    }
+}
+
+/// The cabinet's buttons, with a focus treatment on the platforms that have focus.
+///
+/// `.plain` was here before and is right for touch, but on tvOS it leaves a focused button
+/// looking identical to an unfocused one — unusable with a remote. This keeps the moulded
+/// look and adds the one thing a living-room control needs: somewhere obvious for the eye
+/// to land.
+private struct TelevisionControlButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Face(configuration: configuration)
+    }
+
+    private struct Face: View {
+        // Reads as false anywhere without a focus engine, so touch platforms are untouched.
+        @Environment(\.isFocused) private var isFocused
+        let configuration: Configuration
+
+        var body: some View {
+            configuration.label
+                .scaleEffect(isFocused ? 1.22 : 1)
+                .brightness(isFocused ? 0.28 : 0)
+                .opacity(configuration.isPressed ? 0.7 : 1)
+                .animation(.easeOut(duration: 0.14), value: isFocused)
+                .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+        }
     }
 }
 

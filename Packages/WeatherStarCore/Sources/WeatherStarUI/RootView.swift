@@ -32,6 +32,13 @@ public struct RootView: View {
     /// backgrounding the app, which stops the engine as well.
     @State private var isPictureOn = true
 
+    /// Size of the weather screen, so `showsCabinet` can be answered anywhere.
+    ///
+    /// Reported by a zero-impact `GeometryReader` in the background rather than wrapping
+    /// the screen in one: a `GeometryReader` in the layout path fills its parent and
+    /// anchors top-leading, which would move the picture.
+    @State private var containerSize: CGSize = .zero
+
     @State private var isShowingSettings = false
     @State private var isShowingControls = false
     /// Whether music was playing when the app went to the background, so it can be
@@ -162,6 +169,18 @@ public struct RootView: View {
         #else
         .onTapGesture { isShowingControls ? hideControls() : showControls() }
         #endif
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { containerSize = proxy.size }
+                    .onChange(of: proxy.size) { _, size in containerSize = size }
+            }
+        }
+        // Rotating a phone into portrait brings the set up under an overlay that is already
+        // showing; two sets of controls at once is exactly what this change exists to stop.
+        .onChange(of: showsCabinet) { _, nowShowing in
+            if nowShowing { hideControls() }
+        }
         .animation(.easeInOut(duration: 0.2), value: isShowingControls)
         #if os(tvOS)
         .fullScreenCover(isPresented: $isShowingSettings) { settingsScreen }
@@ -375,7 +394,28 @@ public struct RootView: View {
 
     // MARK: - Controls visibility
 
+    /// Whether the cabinet is on screen, and therefore *is* the control surface.
+    ///
+    /// The same rule `WeatherStarView` draws by, so the two cannot disagree about whether
+    /// there are buttons on screen — a disagreement here is not cosmetic, it is either two
+    /// competing control surfaces or none at all.
+    private var showsCabinet: Bool {
+        TelevisionPresentation.isShowing(
+            layoutMode: settings.layoutMode,
+            showsInLandscape: settings.televisionInLandscape,
+            container: containerSize
+        )
+    }
+
     private func showControls() {
+        // When the set is on screen it is the control surface, and this floating overlay
+        // would be a second one competing with a better one. The cabinet covers everything
+        // it offered — settings, both directions, mute and power — with play/pause still on
+        // the Apple TV remote's own button.
+        //
+        // Only while the cabinet is actually drawn. Without it this overlay is the only way
+        // to reach anything, so it has to come back the moment the set does not.
+        if showsCabinet { return }
         isShowingControls = true
         controlsHideTask?.cancel()
         // Idle timeout, restarted by any remote movement, so the controls stay up while
