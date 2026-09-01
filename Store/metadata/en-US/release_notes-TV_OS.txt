@@ -1,3 +1,14 @@
-• If you have switched the television on under Settings, its power button now silences the
-  music as well as the picture. It used to blank the screen and leave the music playing, so
-  a set that plainly looked switched off carried on making noise.
+• The television now makes the noise a CRT makes. Switching the set on or off sounds like
+  the real thing — the flyback whine, the degauss thump, and the anode cracking into the
+  tube face — synthesised rather than sampled.
+
+• The set's power button is reachable from the remote at last. It was decorative on Apple
+  TV: the focus engine never got to the cabinet, so nothing you pressed could switch the
+  television off. Power now sits on the controls overlay as well.
+
+• The cabinet's buttons show which one the remote is on. They used to look exactly the same
+  focused or not, so the only way to find out was to press one. A focused button now swells
+  and brightens the way a lit control does.
+
+• The Hourly forecast's columns stay inside the blue panel. The hour and the wind speed hung
+  off either edge onto the orange field behind them.

@@ -1,2 +1,7 @@
-• Switching the television off now silences the music as well as the picture. Its power
-  button used to blank the screen and leave the music playing.
+• The television now makes the noise a CRT makes when it is switched on or off.
+
+• Mute has joined the buttons on the cabinet, and the floating controls stay out of the way
+  while the set is on screen.
+
+• The Hourly forecast's columns stay inside the blue panel instead of hanging off either
+  edge.
