@@ -27,17 +27,28 @@ HOW TO REACH SETTINGS
   The first row of Settings is "Close Settings".
 • iPhone / iPad: tap anywhere to bring up the controls, then tap the gear. Held
   upright, the picture is drawn on a television and the gear is the first of the
-  four buttons on the front of the cabinet, below the screen.
+  five buttons on the front of the cabinet, below the screen.
 • Mac: Command-comma, or tap for the controls.
 
-NEW IN THIS VERSION: THE TELEVISION. On a screen taller than it is wide, the
-picture is drawn on a CRT standing in a dark room rather than stretched up the
-screen. On iPhone and iPad that is portrait; on a Mac it is any window taller than
-it is wide. The four buttons on the cabinet are, left to right: Settings, previous
-display, next display, and a power button that switches the picture and the music
-off together and darkens the lamp beside it. The power button does not quit the
-app; pressing it again brings both back. The app opens in landscape, where the picture fills the screen as
-it did before, and rotates freely from there.
+THE TELEVISION. On a screen taller than it is wide, the picture is drawn on a CRT
+standing in a dark room rather than stretched up the screen. On iPhone and iPad
+that is portrait; on a Mac it is any window taller than it is wide. The five
+buttons on the cabinet are, left to right: Settings, previous display, next
+display, mute, and a power button that switches the picture and the music off
+together and darkens the lamp beside it. The power button does not quit the app;
+pressing it again brings both back. The app opens in landscape, where the picture
+fills the screen as it did before, and rotates freely from there.
+
+NEW IN THIS VERSION: THE SET MAKES A NOISE. Switching the television on or off now
+plays a synthesised CRT power sound — a falling whine, a thump, and a crack. It is
+deliberate and it is not the music: it plays whether or not music is switched on,
+because it is the interface making a sound rather than a soundtrack. Mute, the
+fourth button on the cabinet, silences it.
+
+ALSO NEW, ON APPLE TV: the power button is reachable. It was drawn on the cabinet
+but the focus engine could never land on it, so no remote could press it. Power now
+also appears on the controls overlay — swipe up on the remote — and the cabinet's
+buttons brighten and swell to show which one the remote is on.
 
 MUSIC IS OPTIONAL AND OFF BY DEFAULT. The Apple Music source plays a playlist
 from the reviewer's own library and needs an active Apple Music subscription; if
