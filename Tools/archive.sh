@@ -67,7 +67,23 @@ mkdir -p "$BUILD_DIR"
 # App Store distribution for all three. macOS goes to the Mac App Store rather than
 # being notarised for direct download; switch `method` to `developer-id` if you want a
 # standalone .app or .dmg instead.
-cat > "$BUILD_DIR/ExportOptions.plist" <<'PLIST'
+# The team the export signs for.
+#
+# Not optional, and its absence is invisible on a developer's Mac: with `signingStyle`
+# automatic and no `teamID`, xcodebuild infers the team from whatever account Xcode is
+# signed in as. A CI runner is signed in as nobody, so the export has no team to request a
+# distribution profile for and fails with
+#
+#     error: exportArchive Cloud signing permission error
+#     error: exportArchive No profiles for 'net.hlnd.weatherstar' were found
+#
+# which reads like the key lacking permission, and is not — the archive immediately before
+# it succeeded using the same key. Read from project.yml so there is one definition, with
+# an environment override for CI.
+TEAM_ID="${IOS_TEAM_ID:-$(grep -m1 'WS4K_TEAM_ID:' project.yml | tr -d ' "' | cut -d: -f2)}"
+[ -n "$TEAM_ID" ] || { echo "no team id: set IOS_TEAM_ID or WS4K_TEAM_ID in project.yml" >&2; exit 1; }
+
+cat > "$BUILD_DIR/ExportOptions.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -78,6 +94,8 @@ cat > "$BUILD_DIR/ExportOptions.plist" <<'PLIST'
 	<string>app-store-connect</string>
 	<key>signingStyle</key>
 	<string>automatic</string>
+	<key>teamID</key>
+	<string>$TEAM_ID</string>
 	<key>uploadSymbols</key>
 	<true/>
 </dict>

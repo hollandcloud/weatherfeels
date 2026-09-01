@@ -56,6 +56,10 @@ jobs:
     env:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      # The export signs for this team. `archive.sh` falls back to project.yml, so this is
+      # belt and braces rather than load-bearing — but a runner signed in as nobody has no
+      # other way to know, and the failure it produces blames the key instead.
+      IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
     steps:
       - uses: actions/checkout@v4
 
