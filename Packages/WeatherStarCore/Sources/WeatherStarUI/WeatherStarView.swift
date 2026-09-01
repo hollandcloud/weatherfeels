@@ -128,10 +128,11 @@ public struct WeatherStarView: View {
     /// explicit layout choice is taken at face value either way — someone who picks
     /// Portrait wants the tall canvas, not a television showing a 4:3 one.
     private func television(container: CGSize) -> TelevisionGeometry? {
-        guard settings.layoutMode == .auto else { return nil }
-        guard container.width > 0, container.height > 0 else { return nil }
-        let isPortrait = container.height > container.width * 1.05
-        guard isPortrait || settings.televisionInLandscape else { return nil }
+        guard TelevisionPresentation.isShowing(
+            layoutMode: settings.layoutMode,
+            showsInLandscape: settings.televisionInLandscape,
+            container: container
+        ) else { return nil }
         return TelevisionGeometry.resolve(
             container: container,
             pictureAspect: DesignSpace.standard.aspectRatio
@@ -155,9 +156,13 @@ public struct WeatherStarView: View {
                         finish: settings.televisionFinish,
                         controls: TelevisionControls(
                             isPictureOn: isPictureOn,
+                            isSoundOn: settings.musicEnabled,
                             onSettings: onOpenSettings,
                             onPrevious: { engine.previousDisplay() },
                             onNext: { engine.nextDisplay() },
+                            // Straight to the preference: `RootView` already watches it
+                            // and applies the rule, so there is nothing to route upward.
+                            onToggleSound: { settings.musicEnabled.toggle() },
                             onPower: onPower
                         )
                     ) {

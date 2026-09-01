@@ -309,18 +309,12 @@ public final class MusicPlayer {
         }
     }
 
-    /// Declare the audio as ambient playback so it mixes correctly and keeps
-    /// playing when the app is backgrounded on iOS/tvOS.
+    /// Declare the audio as playback so it keeps going when the app is backgrounded.
+    ///
+    /// Delegated to `AudioSession` because the sound effects need the same session and must
+    /// not depend on the music having been started first to get it.
     private func configureAudioSession() {
-        #if !os(macOS)
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [])
-            try session.setActive(true)
-        } catch {
-            logger.warning("Audio session setup failed: \(error.localizedDescription)")
-        }
-        #endif
+        AudioSession.activate()
     }
 
     // MARK: - Now Playing

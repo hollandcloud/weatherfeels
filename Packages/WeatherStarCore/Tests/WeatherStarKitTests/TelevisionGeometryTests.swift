@@ -112,7 +112,12 @@ struct TelevisionGeometryTests {
                 container: container, pictureAspect: Self.pictureAspect
             )
             let chin = geometry.screenSize.width - geometry.bezel * 1.2
-            var used = geometry.controlTouchSize * 4 + geometry.controlStrip * 0.10 * 3
+            // Reads the real count rather than repeating it. Hardcoding 4 here meant the
+            // test kept passing while the chin grew to 5 buttons — measuring a layout the
+            // app no longer draws is worse than not measuring at all.
+            let buttons = CGFloat(TelevisionGeometry.buttonCount)
+            var used = geometry.controlTouchSize * buttons
+                + geometry.controlGap * (buttons - 1)
             if geometry.showsSpeaker { used += geometry.controlStrip * 0.55 }
             if geometry.showsPlate { used += geometry.controlStrip * 1.9 }
             #expect(used <= chin, "\(name): chin needs \(used)pt of \(chin)pt")

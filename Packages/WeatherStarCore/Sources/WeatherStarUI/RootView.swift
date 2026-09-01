@@ -15,6 +15,7 @@ public struct RootView: View {
     @State private var locationService: LocationService
     @State private var musicLibrary: MusicLibrary
     @State private var musicPlayer: MusicPlayer
+    @State private var soundEffects = SoundEffects()
     @State private var transfer: MusicTransfer
 
     @Environment(\.scenePhase) private var scenePhase
@@ -30,6 +31,13 @@ public struct RootView: View {
     /// current weather rather than a stale frame. That is the one way this differs from
     /// backgrounding the app, which stops the engine as well.
     @State private var isPictureOn = true
+
+    /// Size of the weather screen, so `showsCabinet` can be answered anywhere.
+    ///
+    /// Reported by a zero-impact `GeometryReader` in the background rather than wrapping
+    /// the screen in one: a `GeometryReader` in the layout path fills its parent and
+    /// anchors top-leading, which would move the picture.
+    @State private var containerSize: CGSize = .zero
 
     @State private var isShowingSettings = false
     @State private var isShowingControls = false
@@ -137,6 +145,7 @@ public struct RootView: View {
                     isPlaying: engine.isPlaying,
                     trackTitle: musicPlayer.currentTrackTitle,
                     isMusicPlaying: musicPlayer.isPlaying,
+                    isPictureOn: isPictureOn,
                     onPlayPause: { engine.isPlaying.toggle() },
                     onPrevious: { engine.previousDisplay() },
                     onNext: { engine.nextDisplay() },
@@ -145,6 +154,7 @@ public struct RootView: View {
                         hideControls()
                         isShowingSettings = true
                     },
+                    onPower: togglePower,
                     onDismiss: hideControls,
                     onInteraction: showControls
                 )
@@ -159,6 +169,18 @@ public struct RootView: View {
         #else
         .onTapGesture { isShowingControls ? hideControls() : showControls() }
         #endif
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { containerSize = proxy.size }
+                    .onChange(of: proxy.size) { _, size in containerSize = size }
+            }
+        }
+        // Rotating a phone into portrait brings the set up under an overlay that is already
+        // showing; two sets of controls at once is exactly what this change exists to stop.
+        .onChange(of: showsCabinet) { _, nowShowing in
+            if nowShowing { hideControls() }
+        }
         .animation(.easeInOut(duration: 0.2), value: isShowingControls)
         #if os(tvOS)
         .fullScreenCover(isPresented: $isShowingSettings) { settingsScreen }
@@ -322,6 +344,9 @@ public struct RootView: View {
     /// said it was enabled.
     private func togglePower() {
         isPictureOn.toggle()
+        // Before the music state, so the thump lands with the picture rather than after
+        // the music has already stopped.
+        soundEffects.play(isPictureOn ? .powerOn : .powerOff)
         applyMusicState()
     }
 
@@ -369,7 +394,28 @@ public struct RootView: View {
 
     // MARK: - Controls visibility
 
+    /// Whether the cabinet is on screen, and therefore *is* the control surface.
+    ///
+    /// The same rule `WeatherStarView` draws by, so the two cannot disagree about whether
+    /// there are buttons on screen — a disagreement here is not cosmetic, it is either two
+    /// competing control surfaces or none at all.
+    private var showsCabinet: Bool {
+        TelevisionPresentation.isShowing(
+            layoutMode: settings.layoutMode,
+            showsInLandscape: settings.televisionInLandscape,
+            container: containerSize
+        )
+    }
+
     private func showControls() {
+        // When the set is on screen it is the control surface, and this floating overlay
+        // would be a second one competing with a better one. The cabinet covers everything
+        // it offered — settings, both directions, mute and power — with play/pause still on
+        // the Apple TV remote's own button.
+        //
+        // Only while the cabinet is actually drawn. Without it this overlay is the only way
+        // to reach anything, so it has to come back the moment the set does not.
+        if showsCabinet { return }
         isShowingControls = true
         controlsHideTask?.cancel()
         // Idle timeout, restarted by any remote movement, so the controls stay up while
@@ -400,17 +446,27 @@ struct ControlsOverlay: View {
     @FocusState private var focusedControl: Control?
 
     private enum Control: Hashable {
-        case previous, playPause, next, music, settings
+        case previous, playPause, next, music, settings, power
     }
 
     let isPlaying: Bool
     let trackTitle: String
     let isMusicPlaying: Bool
+    /// Whether the television is on, for the power control's icon.
+    let isPictureOn: Bool
     let onPlayPause: () -> Void
     let onPrevious: () -> Void
     let onNext: () -> Void
     let onToggleMusic: () -> Void
     let onSettings: () -> Void
+    /// Switches the set off and on.
+    ///
+    /// The cabinet has a power button of its own, but it is unreachable on Apple TV: the
+    /// focus engine never gets the d-pad, because `weatherScreen`'s one-point button
+    /// consumes it to move between displays. Putting power here — the surface that is
+    /// already focusable, and the only one the remote can reach — is what makes standby
+    /// work on a television at all.
+    let onPower: () -> Void
     let onDismiss: () -> Void
     /// Fired on any remote movement, so the host can restart its idle timer.
     var onInteraction: () -> Void = {}
@@ -433,6 +489,8 @@ struct ControlsOverlay: View {
                     .focused($focusedControl, equals: .music)
                 button("gearshape.fill", action: onSettings)
                     .focused($focusedControl, equals: .settings)
+                button(isPictureOn ? "power" : "power.circle", action: onPower)
+                    .focused($focusedControl, equals: .power)
             }
             #if os(tvOS)
             // Land focus on Settings, since that is what the overlay mostly exists for.

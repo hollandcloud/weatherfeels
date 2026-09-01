@@ -41,6 +41,21 @@ private enum BG {
 }
 
 /// Key vertical positions in the 480pt design canvas, measured from the originals.
+/// How far the blue panel of background 1 is inset from the canvas edges.
+///
+/// Public because it is a layout contract, not a drawing detail: anything laid out over
+/// this panel has to stay inside it, and the standard canvas gives no content inset to
+/// absorb an overrun. `TableColumnFitTests` holds the tables to it.
+public enum BluePanelInset {
+    public static let left: CGFloat = 52
+    public static let right: CGFloat = 56
+
+    /// The panel's horizontal extent on a canvas of `width`.
+    public static func bounds(canvasWidth: CGFloat) -> ClosedRange<CGFloat> {
+        left...(canvasWidth - right)
+    }
+}
+
 private enum Metrics {
     static let stripeTop: CGFloat = 30
     static let stripeBottom: CGFloat = 90
@@ -56,8 +71,8 @@ private enum Metrics {
     static let footerTop: CGFloat = 403
 
     /// Background 1's blue panel.
-    static let boxLeft: CGFloat = 52
-    static let boxRightInset: CGFloat = 56
+    static let boxLeft: CGFloat = BluePanelInset.left
+    static let boxRightInset: CGFloat = BluePanelInset.right
     static let boxGlowWidth: CGFloat = 10
     static let boxGlowBlur: CGFloat = 7
 
