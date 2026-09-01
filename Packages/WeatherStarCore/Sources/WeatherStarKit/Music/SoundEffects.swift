@@ -63,6 +63,10 @@ public final class SoundEffects {
     /// out. A missing file is silence, never a crash — the picture still has to work.
     public func play(_ effect: Effect) {
         guard isEnabled, let player = players[effect] else { return }
+        // Not inherited from the music. With music switched off nothing else asks for
+        // `.playback`, and these would run under the default category — silenced by the
+        // ringer switch and stopped on backgrounding.
+        AudioSession.activate()
         player.currentTime = 0
         player.play()
     }
