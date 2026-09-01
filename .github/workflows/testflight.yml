@@ -132,13 +132,26 @@ jobs:
           PLATFORM: ${{ matrix.platform }}
         run: ./Tools/archive.sh --upload "$PLATFORM"
 
-      # The logs are public on this repository, so only the build log is kept, and only when
-      # something went wrong. It carries compiler output and paths, not credentials.
-      - name: Keep the build log on failure
+      # xcodebuild writes the real reason for an export failure into a log bundle in the
+      # temporary directory and prints only a one-line summary. "Cloud signing permission
+      # error" is that summary, and it is actively misleading — it points at the API key,
+      # which in our case has Admin access and works fine for the archive.
+      - name: Collect the distribution logs on failure
+        if: failure()
+        run: |
+          mkdir -p build/distribution-logs
+          cp -R "$TMPDIR"/*.xcdistributionlogs build/distribution-logs/ 2>/dev/null || true
+          find build/distribution-logs -type f | head -20
+
+      # The logs are public on this repository, so these are kept only when something went
+      # wrong. They carry compiler output, paths and signing diagnostics — not credentials.
+      - name: Keep the logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: build-log-${{ matrix.platform }}
-          path: build/${{ matrix.platform }}.log
+          path: |
+            build/${{ matrix.platform }}.log
+            build/distribution-logs
           retention-days: 7
           if-no-files-found: ignore
