@@ -1,3 +1,14 @@
-• Switching the television off now silences the music as well as the picture. The power
-  button on the cabinet used to blank the screen and leave the music playing, so a set
-  that plainly looked switched off carried on making noise.
+• The television now makes the noise a CRT makes. Switching the set on or off sounds like
+  the real thing — the flyback whine, the degauss thump, and the anode cracking into the
+  tube face — synthesised rather than sampled.
+
+• Mute has joined the buttons on the cabinet, and the floating controls now stay out of the
+  way while the television is on screen. They were a second set of controls competing with
+  the set's own; they still appear when the television is switched off, which is when you
+  need them.
+
+• Turning an iPhone upside down shows the television. That orientation was unsupported, so
+  rotating the phone that way left the app facing whichever way it had been before.
+
+• The Hourly forecast's columns stay inside the blue panel. The hour and the wind speed hung
+  off either edge onto the orange field behind them.
