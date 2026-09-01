@@ -297,8 +297,8 @@ Without it the app targets fail to build with `cannot execute tool 'metal' due t
 Metal Toolchain`, because the CRT shader is compiled into each app bundle.
 
 ```bash
-xcodegen generate        # writes WeatherStar.xcodeproj from project.yml
-open WeatherStar.xcodeproj
+xcodegen generate        # writes weatherfeels.xcodeproj from project.yml
+open weatherfeels.xcodeproj
 ```
 
 Then pick a scheme: **WeatherStar (iOS)**, **WeatherStar (tvOS)** or

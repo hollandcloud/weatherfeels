@@ -4,7 +4,7 @@
 # The .xcodeproj is intentionally not committed — this file is the source of truth,
 # which keeps the repo diffable and avoids project-file merge conflicts.
 
-name: WeatherStar
+name: weatherfeels
 
 options:
   bundleIdPrefix: net.weatherstar
