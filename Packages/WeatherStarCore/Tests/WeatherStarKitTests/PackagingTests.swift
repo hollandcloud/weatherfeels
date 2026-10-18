@@ -486,8 +486,7 @@ struct MusicPlayerTests {
     /// picker — the option is not shown any more.
     @Test("An unavailable persisted source falls back to bundled")
     func unavailableSourceFallsBack() {
-        let suite = "ws4k.test.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
+        let defaults = TemporaryDefaults.make("ws4k.test")
 
         // Write iCloud directly, the way an older build would have left it.
         defaults.set(try! JSONEncoder().encode(MusicSourceKind.iCloud), forKey: "ws4k.musicSource")
@@ -543,8 +542,7 @@ struct MusicPlayerTests {
 struct SettingsTests {
     /// An isolated defaults domain, so tests never touch the real app's settings.
     private func makeSettings() -> (AppSettings, UserDefaults) {
-        let suite = "ws4k.tests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
+        let defaults = TemporaryDefaults.make("ws4k.tests")
         return (AppSettings(defaults: defaults), defaults)
     }
 
