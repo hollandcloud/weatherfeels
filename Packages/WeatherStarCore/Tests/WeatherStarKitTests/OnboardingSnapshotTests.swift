@@ -29,8 +29,7 @@ struct OnboardingSnapshotTests {
 
     private func settings(configure: (AppSettings) -> Void = { _ in }) -> AppSettings {
         // Isolated domain so snapshots never disturb real preferences.
-        let suite = "ws4k.ux.\(UUID().uuidString)"
-        let store = AppSettings(defaults: UserDefaults(suiteName: suite)!)
+        let store = AppSettings(defaults: TemporaryDefaults.make("ws4k.ux"))
         configure(store)
         return store
     }
