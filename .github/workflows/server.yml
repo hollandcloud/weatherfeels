@@ -1,0 +1,36 @@
+name: Companion server
+
+# The companion server's own tests. Separate from ci.yml because it is a separate program —
+# dependency-free Node, not the Swift package — and only needs to run when it changes. Like
+# ci.yml it holds no secrets, since pull requests can come from forks.
+
+on:
+  pull_request:
+    paths: ["server/**", ".github/workflows/server.yml"]
+  push:
+    branches: [main]
+    paths: ["server/**", ".github/workflows/server.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Server tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # The oldest Node the README promises, and the one the Docker image ships.
+        node: ["20", "22"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Run the tests
+        working-directory: server
+        run: npm test

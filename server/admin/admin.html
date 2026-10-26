@@ -1,0 +1,1642 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<title>Companion Admin</title>
+<style>
+:root {
+	color-scheme: dark;
+	--bg: #060a26;
+	--bg-2: #0b1240;
+	--panel: #111a52;
+	--panel-2: #172264;
+	--line: #2a3891;
+	--line-2: #4053c4;
+	--text: #eef1ff;
+	--muted: #aab3e3;
+	--accent: #ffd400;
+	--accent-ink: #15103a;
+	--danger: #ff7a7a;
+	--ok: #5fe095;
+	--radius: 10px;
+	--mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+	--sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+	margin: 0;
+	min-height: 100vh;
+	background-color: var(--bg);
+	background-image: linear-gradient(180deg, #0d1550 0, var(--bg) 420px);
+	background-repeat: no-repeat;
+	color: var(--text);
+	font: 16px/1.45 var(--sans);
+	padding-bottom: calc(96px + env(safe-area-inset-bottom));
+}
+a { color: var(--accent); }
+h1, h2, h3 { font-family: var(--mono); letter-spacing: 0.02em; line-height: 1.2; }
+h2 { font-size: 1.35rem; margin: 0 0 4px; }
+h3 { font-size: 1.05rem; margin: 0 0 8px; }
+p { margin: 0 0 10px; }
+code, pre { font-family: var(--mono); font-size: 0.9em; }
+pre {
+	background: #050822;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	padding: 10px 12px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+.muted { color: var(--muted); }
+.hint { color: var(--muted); font-size: 0.875rem; margin: 6px 0 0; }
+
+/* Masthead and tabs */
+.masthead {
+	position: sticky;
+	top: 0;
+	z-index: 20;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 10px max(16px, env(safe-area-inset-left));
+	background: linear-gradient(180deg, #1a2580, #0f1758);
+	border-bottom: 2px solid var(--line-2);
+}
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand h1 { margin: 0; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand .sub { color: var(--accent); }
+.logo {
+	flex: none;
+	display: grid;
+	place-items: center;
+	width: 34px;
+	height: 34px;
+	border-radius: 6px;
+	background: linear-gradient(180deg, #ffe45c, #f0a800);
+	color: var(--accent-ink);
+	font: 800 0.85rem/1 var(--mono);
+}
+.tabs {
+	display: flex;
+	gap: 6px;
+	overflow-x: auto;
+	padding: 12px 16px 0;
+	max-width: 1100px;
+	margin: 0 auto;
+	scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+	flex: none;
+	min-height: 44px;
+	padding: 0 16px;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	background: var(--panel);
+	color: var(--text);
+	font: 600 0.95rem var(--sans);
+	cursor: pointer;
+}
+.tab[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.tab .count { opacity: 0.75; font-weight: 500; margin-left: 4px; }
+main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+.panel-head { margin: 4px 0 14px; }
+.panel-head p { color: var(--muted); margin: 0; }
+
+/* Surfaces */
+.card {
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	padding: 14px;
+	margin-bottom: 14px;
+}
+.narrow { max-width: 560px; margin: 24px auto; }
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.empty {
+	color: var(--muted);
+	text-align: center;
+	padding: 22px 12px;
+	border: 1px dashed var(--line);
+	border-radius: var(--radius);
+}
+.item {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 10px;
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	padding: 10px 12px;
+}
+.item.off { opacity: 0.62; }
+.item .grow { flex: 1 1 220px; min-width: 0; }
+.item .title { font-weight: 600; overflow-wrap: anywhere; }
+.item .meta { color: var(--muted); font-size: 0.85rem; overflow-wrap: anywhere; }
+.item .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.item video { flex-basis: 100%; width: 100%; max-height: 50vh; background: #000; border-radius: 6px; }
+
+/* Controls */
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	min-height: 44px;
+	min-width: 44px;
+	padding: 0 14px;
+	border: 1px solid var(--line-2);
+	border-radius: 8px;
+	background: var(--panel-2);
+	color: var(--text);
+	font: 600 0.95rem var(--sans);
+	cursor: pointer;
+	text-decoration: none;
+	white-space: nowrap;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; border-color: var(--line); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.danger { color: var(--danger); border-color: #7a2b45; background: #2a1036; }
+.btn.small { min-height: 36px; min-width: 36px; padding: 0 10px; font-size: 0.875rem; }
+.btn.icon { padding: 0; font-family: var(--mono); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.file-btn { position: relative; overflow: hidden; }
+.file-btn:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
+.file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
+.btn-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+label { font-weight: 600; }
+input[type="text"], input[type="password"], input[type="tel"], input:not([type]) {
+	width: 100%;
+	min-height: 44px;
+	padding: 8px 12px;
+	border: 1px solid var(--line-2);
+	border-radius: 8px;
+	background: #070c30;
+	color: var(--text);
+	font: 16px var(--sans);
+}
+input::placeholder { color: #6f79b4; }
+input[type="range"] { width: 100%; accent-color: var(--accent); min-height: 32px; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
+.field { display: grid; gap: 6px; margin-bottom: 14px; border: 0; padding: 0; min-width: 0; }
+.field legend { font-weight: 600; padding: 0; margin-bottom: 6px; }
+.field-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.counter { color: var(--muted); font: 0.8rem var(--mono); white-space: nowrap; }
+.counter.over { color: var(--danger); }
+.req { color: var(--accent); font-weight: 500; font-size: 0.8rem; }
+.inline-form { display: flex; gap: 8px; }
+.inline-form input { flex: 1; }
+.switch {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 44px;
+	font-weight: 600;
+	cursor: pointer;
+	user-select: none;
+}
+.switch input { width: 22px; height: 22px; }
+.badge {
+	display: inline-block;
+	padding: 1px 8px;
+	border-radius: 999px;
+	font-size: 0.75rem;
+	font-weight: 700;
+	border: 1px solid var(--line-2);
+	color: var(--muted);
+}
+.badge.on { color: var(--ok); border-color: #2e7a52; }
+.badge.warn { color: var(--accent); border-color: #7a6a1c; }
+progress { width: 100%; height: 10px; accent-color: var(--accent); }
+.uploads { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.uploads li { display: grid; gap: 4px; font-size: 0.875rem; }
+.uploads .failed { color: var(--danger); }
+.error { color: var(--danger); }
+
+.spaced { margin-top: 20px; }
+
+/* Ticker */
+.ticker-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.text-cell { flex: 1 1 260px; min-width: 0; display: grid; gap: 2px; }
+.ticker-preview {
+	overflow: hidden;
+	margin-bottom: 14px;
+	border-radius: 6px;
+	border: 2px solid #000;
+	background: linear-gradient(180deg, #6a7898, #3c4766);
+	font: 700 1rem/2.4 var(--mono);
+	text-shadow: 2px 2px 0 #000;
+	white-space: nowrap;
+	text-transform: uppercase;
+}
+.ticker-preview span { display: inline-block; padding-left: 100%; animation: marquee 30s linear infinite; }
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+@media (prefers-reduced-motion: reduce) {
+	.ticker-preview span { animation: none; padding-left: 12px; }
+}
+
+/* Theme swatches, shared by the picker, the list and the preview */
+.theme-blue { --ad-top: #141a6e; --ad-bottom: #3459d1; --ad-box: #1b2f8f; --ad-edge: #8aa2ff; }
+.theme-red { --ad-top: #4a0a19; --ad-bottom: #c23047; --ad-box: #7a1428; --ad-edge: #ff9aa8; }
+.theme-green { --ad-top: #0b3a20; --ad-bottom: #2b9a55; --ad-box: #135c31; --ad-edge: #8eeab1; }
+.theme-gold { --ad-top: #3f2a00; --ad-bottom: #c08a10; --ad-box: #6e4d06; --ad-edge: #ffd86b; }
+.theme-purple { --ad-top: #26095a; --ad-bottom: #7542c9; --ad-box: #42198a; --ad-edge: #c8a6ff; }
+.swatch {
+	flex: none;
+	width: 28px;
+	height: 28px;
+	border-radius: 6px;
+	border: 2px solid #000;
+	background: linear-gradient(180deg, var(--ad-top), var(--ad-bottom));
+}
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatches label {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 44px;
+	padding: 4px 12px 4px 6px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: #070c30;
+	cursor: pointer;
+	font-weight: 600;
+}
+.swatches input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.swatches label:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.swatches label:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
+.segmented { display: flex; flex-wrap: wrap; gap: 8px; }
+.segmented label {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 44px;
+	padding: 0 12px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: #070c30;
+	cursor: pointer;
+}
+.segmented label:has(input:checked) { border-color: var(--accent); }
+.image-row { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.image-row img { width: 64px; height: 48px; object-fit: cover; border-radius: 4px; border: 1px solid var(--line-2); }
+
+/* Card editor */
+.editor-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.editor-head h3 { margin: 0; }
+.editor-grid { display: grid; gap: 18px; }
+.preview-wrap { display: grid; gap: 8px; align-content: start; }
+.preview-label { color: var(--muted); font-size: 0.85rem; display: flex; justify-content: space-between; }
+@media (min-width: 800px) {
+	.editor-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
+	.preview-wrap { position: sticky; top: 76px; }
+}
+/* On a phone the preview leads, so opening a card shows what it looks like. */
+@media (max-width: 799px) {
+	.preview-wrap { order: -1; }
+}
+
+/* WeatherStar-style ad card preview. Sizes are in container units so the card
+   scales as one piece, the way the app draws it at any screen size. */
+.ad {
+	container-type: inline-size;
+	position: relative;
+	aspect-ratio: 4 / 3;
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	border: 3px solid #000;
+	border-radius: 6px;
+	background: linear-gradient(180deg, var(--ad-top) 0%, var(--ad-bottom) 100%);
+	color: #fff;
+	font-family: var(--mono);
+	text-shadow: 2px 2px 0 #000;
+}
+.ad-head {
+	padding: 3cqw 4cqw 2cqw;
+	font-size: 6.6cqw;
+	font-weight: 800;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	line-height: 1.05;
+	overflow-wrap: anywhere;
+}
+.ad-head.placeholder { color: rgba(255, 255, 255, 0.45); }
+.ad-main {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	gap: 3cqw;
+	margin: 0 4cqw;
+	padding: 3cqw;
+	border: 0.6cqw solid var(--ad-edge);
+	border-radius: 1.2cqw;
+	background: color-mix(in srgb, var(--ad-box) 88%, transparent);
+	overflow: hidden;
+}
+.ad-image { flex: 0 0 40%; min-width: 0; }
+.ad-image img { width: 100%; height: 100%; object-fit: cover; border: 0.5cqw solid #000; display: block; }
+.ad-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1.6cqw; }
+.ad-headline { color: #ffe23a; font-size: 5.4cqw; font-weight: 800; line-height: 1.1; overflow-wrap: anywhere; }
+.ad-lines { display: grid; gap: 1cqw; font-size: 4.3cqw; line-height: 1.15; }
+.ad-lines div { overflow-wrap: anywhere; }
+.ad-phone { margin-top: auto; color: #ffe23a; font-size: 6.4cqw; font-weight: 800; letter-spacing: 0.05em; }
+.ad-foot {
+	margin-top: 2.4cqw;
+	padding: 1.6cqw 4cqw;
+	min-height: 8cqw;
+	background: linear-gradient(180deg, #6a7898, #3c4766);
+	border-top: 0.5cqw solid #000;
+	font-size: 4cqw;
+	text-align: center;
+	overflow-wrap: anywhere;
+}
+.ad.mode-full .ad-image { position: absolute; inset: 0; }
+.ad.mode-full .ad-image img { border: 0; }
+.ad.mode-full .ad-text {
+	position: relative;
+	justify-content: flex-end;
+	margin: -3cqw;
+	padding: 3cqw;
+	background: linear-gradient(180deg, transparent 30%, rgba(4, 8, 40, 0.82) 72%);
+}
+
+/* Save bar and toast */
+.savebar {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 30;
+	background: rgba(9, 14, 52, 0.96);
+	border-top: 2px solid var(--line-2);
+	padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+	backdrop-filter: blur(6px);
+}
+.savebar-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+.savebar .status { flex: 1; min-width: 0; font-size: 0.9rem; }
+.savebar .status.dirty { color: var(--accent); }
+.savebar .status.saved { color: var(--ok); }
+.savebar .btn { min-width: 110px; }
+.save-errors { max-width: 1100px; margin: 0 auto 8px; color: var(--danger); font-size: 0.875rem; max-height: 28vh; overflow-y: auto; }
+.save-errors ul { margin: 4px 0 0; padding-left: 20px; }
+.toast {
+	position: fixed;
+	left: 50%;
+	bottom: calc(88px + env(safe-area-inset-bottom));
+	z-index: 40;
+	transform: translateX(-50%);
+	max-width: calc(100vw - 32px);
+	padding: 10px 16px;
+	border-radius: 8px;
+	background: #1d2a85;
+	border: 1px solid var(--line-2);
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+	font-size: 0.9rem;
+}
+.toast.bad { border-color: var(--danger); }
+.visually-hidden {
+	position: absolute !important;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+@media (max-width: 520px) {
+	.brand h1 .sub { display: none; }
+	.item .actions { margin-left: 0; width: 100%; }
+	.item .actions .btn { flex: 1 1 auto; }
+}
+</style>
+</head>
+<body>
+<header class="masthead">
+	<div class="brand">
+		<span class="logo" aria-hidden="true">WS</span>
+		<h1>weatherfeels <span class="sub">companion</span></h1>
+	</div>
+	<button id="sign-out" class="btn small" type="button" hidden>Sign out</button>
+</header>
+
+<div id="view-loading" class="narrow card"><p class="muted">Connecting to the server…</p></div>
+
+<section id="view-disabled" class="narrow card" hidden aria-labelledby="disabled-title">
+	<h2 id="disabled-title">Admin is switched off</h2>
+	<p>This server has no admin token, so nothing can be changed from here. The app can still play the music and ads it already holds.</p>
+	<p>To turn admin on, set <code>WS4K_TOKEN</code> to a long random secret and restart the server. For example:</p>
+	<pre>WS4K_TOKEN=$(openssl rand -hex 32) node server.mjs</pre>
+	<p><strong>Docker:</strong> set <code>WS4K_TOKEN</code> in a <code>.env</code> file beside <code>docker-compose.yml</code>, or pass <code>-e WS4K_TOKEN=…</code> to <code>docker run</code>.</p>
+	<p><strong>systemd:</strong> put <code>WS4K_TOKEN=…</code> in <code>/etc/weatherfeels-companion.env</code>, then <code>sudo systemctl restart weatherfeels-companion</code>.</p>
+	<p class="muted">Then reload this page and sign in with that token. Keep it secret: it lets anyone who has it change what the app shows.</p>
+</section>
+
+<section id="view-login" class="narrow card" hidden aria-labelledby="login-title">
+	<h2 id="login-title">Sign in</h2>
+	<form id="login-form" novalidate>
+		<div class="field">
+			<label for="login-token">Admin token</label>
+			<input id="login-token" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required>
+			<p class="hint">The value of <code>WS4K_TOKEN</code> on the server. It is kept in this browser tab only and forgotten when the tab closes.</p>
+		</div>
+		<p id="login-error" class="error" role="alert" hidden></p>
+		<button class="btn primary" type="submit">Sign in</button>
+	</form>
+</section>
+
+<div id="view-app" hidden>
+	<nav class="tabs" role="tablist" aria-label="Sections">
+		<button class="tab" role="tab" type="button" id="tab-music" data-tab="music" aria-controls="panel-music">Music<span class="count" data-count="music"></span></button>
+		<button class="tab" role="tab" type="button" id="tab-ticker" data-tab="ticker" aria-controls="panel-ticker">Ticker<span class="count" data-count="ticker"></span></button>
+		<button class="tab" role="tab" type="button" id="tab-cards" data-tab="cards" aria-controls="panel-cards">Ad cards<span class="count" data-count="cards"></span></button>
+		<button class="tab" role="tab" type="button" id="tab-clips" data-tab="clips" aria-controls="panel-clips">Clips<span class="count" data-count="clips"></span></button>
+		<button class="tab" role="tab" type="button" id="tab-files" data-tab="files" aria-controls="panel-files">Files</button>
+	</nav>
+
+	<main>
+		<section id="panel-music" role="tabpanel" aria-labelledby="tab-music" data-panel="music">
+			<div class="panel-head">
+				<h2>Music</h2>
+				<p>Tracks the app plays. Uploads and deletions take effect straight away; there is nothing to save.</p>
+			</div>
+			<div class="card">
+				<div class="btn-row">
+					<label class="btn primary file-btn">Upload tracks<input id="music-input" type="file" multiple accept="audio/*,.mp3,.m4a,.mp4,.aac,.wav,.aif,.aiff,.caf,.flac,.alac"></label>
+				</div>
+				<p class="hint">MP3, M4A, AAC, WAV, AIFF, CAF or FLAC, up to <span data-max-upload></span> each. Names are tidied to letters, digits, spaces, dots, dashes and underscores.</p>
+				<ul id="music-uploads" class="uploads" aria-live="polite"></ul>
+			</div>
+			<ul id="music-list" class="list"></ul>
+		</section>
+
+		<section id="panel-ticker" role="tabpanel" aria-labelledby="tab-ticker" data-panel="ticker" hidden>
+			<div class="panel-head">
+				<h2>Ticker</h2>
+				<p>Lines that crawl along the bottom of the screen between forecasts.</p>
+			</div>
+			<form id="ticker-add" class="card" novalidate>
+				<div class="field">
+					<div class="field-head"><label for="ticker-new">New line</label><span class="counter" id="ticker-new-count"></span></div>
+					<div class="inline-form">
+						<input id="ticker-new" type="text" maxlength="120" autocomplete="off" placeholder="VISIT GULF COAST MARINE  555-0142">
+						<button class="btn primary" type="submit">Add</button>
+					</div>
+				</div>
+			</form>
+			<div class="ticker-preview" aria-hidden="true"><span id="ticker-preview-text"></span></div>
+			<ul id="ticker-list" class="list"></ul>
+		</section>
+
+		<section id="panel-cards" role="tabpanel" aria-labelledby="tab-cards" data-panel="cards" hidden>
+			<div id="cards-index">
+				<div class="panel-head">
+					<h2>Ad cards</h2>
+					<p>Full-screen "local business" ads, shown between pages in WeatherStar style.</p>
+				</div>
+				<div class="btn-row card">
+					<button id="card-new" class="btn primary" type="button">New card</button>
+				</div>
+				<ul id="card-list" class="list"></ul>
+			</div>
+
+			<section id="card-editor" class="card" hidden aria-labelledby="editor-title">
+				<div class="editor-head">
+					<h3 id="editor-title">Edit card</h3>
+					<button id="editor-done" class="btn primary" type="button">Done</button>
+				</div>
+				<div class="editor-grid">
+					<form id="card-form" novalidate>
+						<div class="field">
+							<div class="field-head"><label for="f-business">Business <span class="req">required</span></label><span class="counter" data-counter="business"></span></div>
+							<input id="f-business" type="text" maxlength="40" data-field="business" autocomplete="off" placeholder="Gulf Coast Marine">
+						</div>
+						<div class="field">
+							<div class="field-head"><label for="f-headline">Headline</label><span class="counter" data-counter="headline"></span></div>
+							<input id="f-headline" type="text" maxlength="60" data-field="headline" autocomplete="off" placeholder="Boat Repair &amp; Detailing">
+						</div>
+						<fieldset class="field">
+							<legend>Lines</legend>
+							<input id="f-line-0" type="text" maxlength="48" data-line="0" autocomplete="off" aria-label="Line 1" placeholder="Outboards serviced">
+							<input id="f-line-1" type="text" maxlength="48" data-line="1" autocomplete="off" aria-label="Line 2" placeholder="Free estimates">
+							<input id="f-line-2" type="text" maxlength="48" data-line="2" autocomplete="off" aria-label="Line 3">
+							<input id="f-line-3" type="text" maxlength="48" data-line="3" autocomplete="off" aria-label="Line 4">
+							<p class="hint">Up to four lines of 48 characters.</p>
+						</fieldset>
+						<div class="field">
+							<div class="field-head"><label for="f-phone">Phone</label><span class="counter" data-counter="phone"></span></div>
+							<input id="f-phone" type="tel" maxlength="24" data-field="phone" autocomplete="off" placeholder="555-0142">
+						</div>
+						<div class="field">
+							<div class="field-head"><label for="f-footer">Footer</label><span class="counter" data-counter="footer"></span></div>
+							<input id="f-footer" type="text" maxlength="48" data-field="footer" autocomplete="off" placeholder="Open 7 days">
+						</div>
+						<fieldset class="field">
+							<legend>Theme</legend>
+							<div class="swatches" id="f-theme"></div>
+						</fieldset>
+						<fieldset class="field">
+							<legend>Image</legend>
+							<div class="image-row">
+								<img id="f-image-thumb" alt="" hidden>
+								<span id="f-image-name" class="muted">No image</span>
+							</div>
+							<div class="btn-row">
+								<label class="btn file-btn">Choose image<input id="f-image" type="file" accept="image/png,image/jpeg,image/gif,image/webp,.png,.jpg,.jpeg,.gif,.webp"></label>
+								<button id="f-image-remove" class="btn" type="button">Remove image</button>
+							</div>
+							<progress id="f-image-progress" max="1" value="0" hidden></progress>
+							<p id="f-image-error" class="error" hidden></p>
+							<div class="segmented" role="radiogroup" aria-label="Image placement">
+								<label><input type="radio" name="imageMode" value="beside"> Beside the text</label>
+								<label><input type="radio" name="imageMode" value="full"> Fill the card</label>
+							</div>
+						</fieldset>
+						<div class="field">
+							<label for="f-seconds">On screen for <output id="f-seconds-out" for="f-seconds">10</output> seconds</label>
+							<input id="f-seconds" type="range" min="4" max="30" step="1">
+						</div>
+						<label class="switch"><input id="f-enabled" type="checkbox"> Show this card in the app</label>
+					</form>
+					<div class="preview-wrap">
+						<div class="preview-label"><span>Preview</span><span id="preview-note"></span></div>
+						<div id="card-preview"></div>
+						<p class="hint">An approximation. The app draws the card itself, in its own font.</p>
+					</div>
+				</div>
+			</section>
+		</section>
+
+		<section id="panel-clips" role="tabpanel" aria-labelledby="tab-clips" data-panel="clips" hidden>
+			<div class="panel-head">
+				<h2>Clips</h2>
+				<p>A reel of video clips the app can play as an ad break.</p>
+			</div>
+			<div class="card">
+				<div class="btn-row">
+					<label class="btn primary file-btn">Upload clips<input id="clip-input" type="file" multiple accept="video/mp4,video/quicktime,video/x-m4v,.mp4,.m4v,.mov"></label>
+				</div>
+				<p class="hint">MP4, M4V or MOV, up to <span data-max-upload></span> each. H.264 or HEVC plays on every Apple device. New clips are added to the list; press Save to publish them.</p>
+				<ul id="clip-uploads" class="uploads" aria-live="polite"></ul>
+			</div>
+			<ul id="clip-list" class="list"></ul>
+		</section>
+
+		<section id="panel-files" role="tabpanel" aria-labelledby="tab-files" data-panel="files" hidden>
+			<div class="panel-head">
+				<h2>Files</h2>
+				<p>Every ad image and clip on the server. A file nothing uses can be deleted here.</p>
+			</div>
+			<h3>Images</h3>
+			<ul id="files-images" class="list"></ul>
+			<h3 class="spaced">Clips</h3>
+			<ul id="files-clips" class="list"></ul>
+			<div class="card spaced">
+				<h3>Static hosting</h3>
+				<p>The app reads ads from any web server, not only this one. To publish them on a static host, save the <a href="/ads.json" download="ads.json">public ads.json</a> (enabled items only) to the root of the site, and copy this server's <code>images/</code> and <code>clips/</code> folders into an <code>ads/</code> folder beside it.</p>
+			</div>
+		</section>
+	</main>
+</div>
+
+<footer id="savebar" class="savebar" hidden>
+	<div id="save-errors" class="save-errors" role="alert" hidden></div>
+	<div class="savebar-inner">
+		<span id="save-status" class="status" aria-live="polite"></span>
+		<button id="save" class="btn primary" type="button" disabled>Save</button>
+	</div>
+</footer>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+'use strict';
+(() => {
+	// Every piece of user-entered text reaches the page through textContent or an
+	// input's value. Nothing here assigns HTML, so an ad line containing markup is
+	// shown as the characters it is.
+
+	const LIMITS = {
+		tickerText: 120, business: 40, headline: 60, lines: 4, line: 48,
+		phone: 24, footer: 48, clipTitle: 80, secondsMin: 4, secondsMax: 30,
+	};
+	const THEMES = [
+		{ id: 'blue', label: 'Blue' },
+		{ id: 'red', label: 'Red' },
+		{ id: 'green', label: 'Green' },
+		{ id: 'gold', label: 'Gold' },
+		{ id: 'purple', label: 'Purple' },
+	];
+	const DEFAULTS = { imageMode: 'beside', theme: 'blue', seconds: 10 };
+	const AUDIO_EXTS = ['mp3', 'm4a', 'mp4', 'alac', 'aac', 'wav', 'aif', 'aiff', 'caf', 'flac'];
+	const IMAGE_TYPES = { png: 'png', jpg: 'jpg', jpeg: 'jpg', gif: 'gif', webp: 'webp', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
+	const CLIP_TYPES = { mp4: 'mp4', m4v: 'm4v', mov: 'mov', 'video/mp4': 'mp4', 'video/x-m4v': 'm4v', 'video/quicktime': 'mov' };
+	const AD_PATH = /^ads\/(images|clips)\/[A-Za-z0-9._ -]+$/;
+	const TOKEN_KEY = 'ws4k.adminToken';
+
+	const state = {
+		token: '',
+		manifest: { ticker: [], cards: [], clips: [] },
+		tracks: [],
+		files: { images: [], clips: [] },
+		maxUploadBytes: 0,
+		dirty: false,
+		saving: false,
+		pendingDeletes: new Set(),
+		editing: null,
+		tab: 'music',
+	};
+
+	// --- Small helpers -------------------------------------------------------
+
+	const $ = (selector, root = document) => root.querySelector(selector);
+	const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+
+	/** Build an element. Text is only ever set through textContent or text nodes. */
+	const h = (tag, props = {}, ...children) => {
+		const node = document.createElement(tag);
+		for (const [key, value] of Object.entries(props)) {
+			if (value === undefined || value === null || value === false) continue;
+			if (key === 'class') node.className = value;
+			else if (key === 'text') node.textContent = value;
+			else if (key === 'dataset') Object.assign(node.dataset, value);
+			else if (key.startsWith('on')) node.addEventListener(key.slice(2), value);
+			else if (key in node) node[key] = value;
+			else node.setAttribute(key, value === true ? '' : String(value));
+		}
+		for (const child of children.flat()) {
+			if (child === undefined || child === null || child === false) continue;
+			node.append(child instanceof Node ? child : document.createTextNode(String(child)));
+		}
+		return node;
+	};
+
+	const chars = (value) => [...(value ?? '')].length;
+
+	const formatBytes = (bytes) => {
+		if (!Number.isFinite(bytes)) return '';
+		const units = ['bytes', 'KB', 'MB', 'GB'];
+		let value = bytes;
+		let unit = 0;
+		while (value >= 1024 && unit < units.length - 1) {
+			value /= 1024;
+			unit += 1;
+		}
+		return `${unit === 0 ? value : value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`;
+	};
+
+	const randomId = (prefix) => {
+		const bytes = new Uint8Array(6);
+		crypto.getRandomValues(bytes);
+		return `${prefix}-${[...bytes].map((b) => b.toString(36).padStart(2, '0')).join('').slice(0, 8)}`;
+	};
+
+	const stamp = () => Date.now().toString(36);
+
+	const extension = (name) => {
+		const match = /\.([A-Za-z0-9]+)$/.exec(name ?? '');
+		return match ? match[1].toLowerCase() : '';
+	};
+
+	/** Tidy a file name to what the server accepts: [A-Za-z0-9._ -], no leading dot. */
+	const tidyName = (name) => {
+		const ext = extension(name);
+		const stem = (ext ? name.slice(0, -(ext.length + 1)) : name)
+			.normalize('NFKD')
+			.replace(/[̀-ͯ]/g, '')
+			.replace(/[^A-Za-z0-9._ -]+/g, '_')
+			.replace(/\.{2,}/g, '.')
+			.replace(/^[.\s_]+|[.\s]+$/g, '')
+			.slice(0, 100) || 'track';
+		return `${stem}.${ext}`;
+	};
+
+	const encodePath = (path) => path.split('/').map(encodeURIComponent).join('/');
+
+	/** Same-origin URL for a manifest path, or null for anything unexpected. */
+	const adUrl = (path) => (AD_PATH.test(path ?? '') ? `/${encodePath(path)}` : null);
+
+	let toastTimer = null;
+	const toast = (message, bad = false) => {
+		const node = $('#toast');
+		node.textContent = message;
+		node.classList.toggle('bad', bad);
+		node.hidden = false;
+		clearTimeout(toastTimer);
+		toastTimer = setTimeout(() => { node.hidden = true; }, bad ? 6000 : 3000);
+	};
+
+	// --- Token and views -----------------------------------------------------
+
+	const storage = {
+		get() { try { return sessionStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; } },
+		set(value) { try { sessionStorage.setItem(TOKEN_KEY, value); } catch { /* private mode */ } },
+		clear() { try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* private mode */ } },
+	};
+
+	const showView = (name) => {
+		for (const view of ['loading', 'disabled', 'login', 'app']) {
+			$(`#view-${view}`).hidden = view !== name;
+		}
+		$('#savebar').hidden = name !== 'app';
+		$('#sign-out').hidden = name !== 'app';
+		if (name === 'login') $('#login-token').focus();
+	};
+
+	const signOut = (message) => {
+		state.token = '';
+		storage.clear();
+		showView('login');
+		const error = $('#login-error');
+		error.textContent = message ?? '';
+		error.hidden = !message;
+	};
+
+	// --- Server calls --------------------------------------------------------
+
+	class ApiError extends Error {
+		constructor(status, message, fields) {
+			super(message);
+			this.status = status;
+			this.fields = fields;
+		}
+	}
+
+	const handleAuthFailure = (status, data) => {
+		if (status === 403 && data?.code === 'admin-disabled') {
+			showView('disabled');
+			return true;
+		}
+		if (status === 401) {
+			signOut('That token was not accepted. Sign in again.');
+			return true;
+		}
+		return false;
+	};
+
+	const api = async (method, url, body) => {
+		const init = { method, cache: 'no-store', headers: { Authorization: `Bearer ${state.token}` } };
+		if (body !== undefined) {
+			init.headers['Content-Type'] = 'application/json';
+			init.body = JSON.stringify(body);
+		}
+		let response;
+		try {
+			response = await fetch(url, init);
+		} catch {
+			throw new ApiError(0, 'Could not reach the server.');
+		}
+		const data = await response.json().catch(() => ({}));
+		if (!response.ok) {
+			handleAuthFailure(response.status, data);
+			throw new ApiError(response.status, data.error || `The server answered ${response.status}.`, data.fields);
+		}
+		return data;
+	};
+
+	/** PUT a file with upload progress, which fetch cannot report. */
+	const upload = (url, file, onProgress) => new Promise((resolve, reject) => {
+		if (state.maxUploadBytes && file.size > state.maxUploadBytes) {
+			reject(new ApiError(413, `Too large: the server accepts up to ${formatBytes(state.maxUploadBytes)}.`));
+			return;
+		}
+		const xhr = new XMLHttpRequest();
+		xhr.open('PUT', url);
+		xhr.setRequestHeader('Authorization', `Bearer ${state.token}`);
+		xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+		xhr.upload.addEventListener('progress', (event) => {
+			if (event.lengthComputable) onProgress(event.loaded / event.total);
+		});
+		xhr.addEventListener('load', () => {
+			let data = {};
+			try { data = JSON.parse(xhr.responseText); } catch { /* not JSON */ }
+			if (xhr.status >= 200 && xhr.status < 300) {
+				resolve(data);
+				return;
+			}
+			handleAuthFailure(xhr.status, data);
+			reject(new ApiError(xhr.status, data.error || `Upload failed (${xhr.status}).`));
+		});
+		xhr.addEventListener('error', () => reject(new ApiError(0, 'The upload was interrupted.')));
+		xhr.addEventListener('abort', () => reject(new ApiError(0, 'The upload was cancelled.')));
+		xhr.send(file);
+	});
+
+	/** One row in an upload list, with a progress bar. */
+	const uploadRow = (list, label) => {
+		const bar = h('progress', { max: 1, value: 0 });
+		const note = h('span', { class: 'muted', text: 'Uploading…' });
+		const row = h('li', {}, h('span', {}, h('strong', { text: label }), ' ', note), bar);
+		list.prepend(row);
+		return {
+			progress(fraction) { bar.value = fraction; },
+			done(message) {
+				note.textContent = message;
+				bar.value = 1;
+				setTimeout(() => row.remove(), 4000);
+			},
+			fail(message) {
+				note.textContent = message;
+				row.classList.add('failed');
+				bar.remove();
+			},
+		};
+	};
+
+	// --- Loading -------------------------------------------------------------
+
+	const withFlag = (item) => ({ ...item, enabled: item.enabled !== false });
+
+	const loadManifest = async () => {
+		const data = await api('GET', '/api/ads');
+		state.manifest = {
+			ticker: (data.ticker ?? []).map(withFlag),
+			cards: (data.cards ?? []).map(withFlag),
+			clips: (data.clips ?? []).map(withFlag),
+		};
+		state.dirty = false;
+	};
+
+	const loadTracks = async () => {
+		const data = await api('GET', '/api/music');
+		state.tracks = data.tracks ?? [];
+		state.maxUploadBytes = data.maxUploadBytes ?? state.maxUploadBytes;
+	};
+
+	const loadFiles = async () => {
+		const data = await api('GET', '/api/ads/files');
+		state.files = { images: data.images ?? [], clips: data.clips ?? [] };
+		state.maxUploadBytes = data.maxUploadBytes ?? state.maxUploadBytes;
+	};
+
+	// --- Dirty state and saving ---------------------------------------------
+
+	const renderSaveBar = (message) => {
+		const status = $('#save-status');
+		status.classList.toggle('dirty', state.dirty);
+		status.classList.toggle('saved', !state.dirty && Boolean(message));
+		status.textContent = state.saving
+			? 'Saving…'
+			: state.dirty ? 'Unsaved changes to ticker, cards or clips.' : (message ?? 'Everything is saved.');
+		$('#save').disabled = !state.dirty || state.saving;
+	};
+
+	const markDirty = () => {
+		state.dirty = true;
+		renderSaveBar();
+		renderCounts();
+	};
+
+	const describeField = (field) => {
+		const match = /^(ticker|cards|clips)\[(\d+)\]\.?(.*)$/.exec(field);
+		if (!match) return field;
+		const [, section, index, rest] = match;
+		const item = state.manifest[section]?.[Number(index)];
+		const names = { ticker: 'Ticker line', cards: 'Card', clips: 'Clip' };
+		const label = item?.business || item?.title || item?.text;
+		const where = `${names[section]} ${Number(index) + 1}${label ? ` (${label.slice(0, 30)})` : ''}`;
+		return rest ? `${where}, ${rest}` : where;
+	};
+
+	const showSaveErrors = (message, fields) => {
+		const box = $('#save-errors');
+		box.replaceChildren(h('strong', { text: message }));
+		if (fields?.length) {
+			box.append(h('ul', {}, fields.map((f) => h('li', { text: `${describeField(f.field)}: ${f.message}` }))));
+		}
+		box.hidden = false;
+	};
+
+	const isReferenced = (path) => state.manifest.cards.some((c) => c.image === path)
+		|| state.manifest.clips.some((c) => c.file === path);
+
+	/** Drop empty optional fields, so the saved manifest stays tidy. */
+	const cleanCard = (card) => {
+		const out = { id: card.id, business: (card.business ?? '').trim() };
+		for (const key of ['headline', 'phone', 'footer', 'image']) {
+			const value = (card[key] ?? '').trim();
+			if (value) out[key] = value;
+		}
+		const lines = (card.lines ?? []).map((l) => (l ?? '').trim()).filter(Boolean);
+		if (lines.length) out.lines = lines;
+		out.imageMode = card.imageMode ?? DEFAULTS.imageMode;
+		out.theme = card.theme ?? DEFAULTS.theme;
+		out.seconds = Number(card.seconds ?? DEFAULTS.seconds);
+		out.enabled = card.enabled !== false;
+		return out;
+	};
+
+	const manifestBody = () => ({
+		version: 1,
+		ticker: state.manifest.ticker.map((t) => ({ id: t.id, text: (t.text ?? '').trim(), enabled: t.enabled !== false })),
+		cards: state.manifest.cards.map(cleanCard),
+		clips: state.manifest.clips.map((c) => {
+			const clip = { id: c.id };
+			const title = (c.title ?? '').trim();
+			if (title) clip.title = title;
+			clip.file = c.file;
+			clip.enabled = c.enabled !== false;
+			return clip;
+		}),
+	});
+
+	const save = async () => {
+		if (state.saving) return;
+		state.saving = true;
+		renderSaveBar();
+		$('#save-errors').hidden = true;
+		try {
+			const saved = await api('PUT', '/api/ads', manifestBody());
+			state.manifest = {
+				ticker: saved.ticker.map(withFlag),
+				cards: saved.cards.map(withFlag),
+				clips: saved.clips.map(withFlag),
+			};
+			state.dirty = false;
+
+			// Files replaced or removed in this session go once the manifest that no
+			// longer needs them is safely written.
+			for (const path of [...state.pendingDeletes]) {
+				if (!isReferenced(path) && AD_PATH.test(path)) {
+					// eslint-disable-next-line no-await-in-loop
+					await api('DELETE', `/api/${encodePath(path)}`).catch(() => {});
+				}
+				state.pendingDeletes.delete(path);
+			}
+			await loadFiles().catch(() => {});
+			state.saving = false;
+			renderAll();
+			renderSaveBar(`Saved at ${new Date().toLocaleTimeString()}.`);
+			toast('Saved. The app picks this up next time it checks.');
+		} catch (error) {
+			state.saving = false;
+			renderSaveBar();
+			if (error.status !== 401 && error.status !== 403) {
+				showSaveErrors(error.status === 400 ? 'Not saved. Fix these and save again:' : `Not saved: ${error.message}`, error.fields);
+			}
+		}
+	};
+
+	// --- Tabs ----------------------------------------------------------------
+
+	const TABS = ['music', 'ticker', 'cards', 'clips', 'files'];
+
+	const selectTab = (tab, { focus = false } = {}) => {
+		state.tab = TABS.includes(tab) ? tab : 'music';
+		for (const button of $$('.tab')) {
+			const selected = button.dataset.tab === state.tab;
+			button.setAttribute('aria-selected', String(selected));
+			button.tabIndex = selected ? 0 : -1;
+			if (selected && focus) button.focus();
+		}
+		for (const panel of $$('[data-panel]')) panel.hidden = panel.dataset.panel !== state.tab;
+		if (location.hash !== `#${state.tab}`) history.replaceState(null, '', `#${state.tab}`);
+	};
+
+	const renderCounts = () => {
+		const counts = {
+			music: state.tracks.length,
+			ticker: state.manifest.ticker.length,
+			cards: state.manifest.cards.length,
+			clips: state.manifest.clips.length,
+		};
+		for (const node of $$('[data-count]')) node.textContent = ` ${counts[node.dataset.count]}`;
+		for (const node of $$('[data-max-upload]')) node.textContent = formatBytes(state.maxUploadBytes);
+	};
+
+	// --- Shared list controls ------------------------------------------------
+
+	const move = (list, index, delta, rerender, focusSelector) => {
+		const target = index + delta;
+		if (target < 0 || target >= list.length) return;
+		[list[index], list[target]] = [list[target], list[index]];
+		markDirty();
+		rerender();
+		const id = list[target].id;
+		const row = $$('[data-id]').find((node) => node.dataset.id === id);
+		row?.querySelector(focusSelector)?.focus();
+	};
+
+	const orderButtons = (list, index, rerender) => [
+		h('button', {
+			class: 'btn small icon', type: 'button', text: '↑', 'aria-label': 'Move up', title: 'Move up',
+			disabled: index === 0, dataset: { action: 'up' },
+			onclick: () => move(list, index, -1, rerender, index - 1 === 0 ? '[data-action="down"]' : '[data-action="up"]'),
+		}),
+		h('button', {
+			class: 'btn small icon', type: 'button', text: '↓', 'aria-label': 'Move down', title: 'Move down',
+			disabled: index === list.length - 1, dataset: { action: 'down' },
+			onclick: () => move(list, index, 1, rerender, index + 1 === list.length - 1 ? '[data-action="up"]' : '[data-action="down"]'),
+		}),
+	];
+
+	const enabledToggle = (item, label, rerender) => h('label', { class: 'switch' },
+		h('input', {
+			type: 'checkbox',
+			checked: item.enabled !== false,
+			'aria-label': 'Show in the app',
+			onchange: (event) => {
+				item.enabled = event.target.checked;
+				markDirty();
+				rerender();
+				$$('[data-id]').find((node) => node.dataset.id === item.id)
+					?.querySelector('input[type="checkbox"]')?.focus();
+			},
+		}),
+		label);
+
+	const counter = (node, value, max) => {
+		const used = chars(value);
+		node.textContent = `${used}/${max}`;
+		node.classList.toggle('over', used > max);
+	};
+
+	const emptyNote = (text) => h('li', { class: 'empty', text });
+
+	// --- Music ---------------------------------------------------------------
+
+	const renderMusic = () => {
+		const list = $('#music-list');
+		if (!state.tracks.length) {
+			list.replaceChildren(emptyNote('No tracks yet. Upload some above, or from the app.'));
+			return;
+		}
+		list.replaceChildren(...state.tracks.map((track) => h('li', { class: 'item' },
+			h('div', { class: 'grow' },
+				h('div', { class: 'title', text: track.name.split('/').pop() }),
+				h('div', { class: 'meta', text: [track.name.includes('/') ? track.name : null, formatBytes(track.size)].filter(Boolean).join(' · ') })),
+			h('div', { class: 'actions' },
+				h('button', {
+					class: 'btn small danger', type: 'button', text: 'Delete',
+					'aria-label': `Delete ${track.name}`,
+					onclick: async () => {
+						if (!confirm(`Delete "${track.name}" from the server? This cannot be undone.`)) return;
+						try {
+							await api('DELETE', `/api/music/${encodePath(track.name)}`);
+							toast(`Deleted ${track.name}.`);
+						} catch (error) {
+							toast(error.message, true);
+						}
+						await loadTracks().catch(() => {});
+						renderMusic();
+						renderCounts();
+					},
+				})))));
+	};
+
+	const uploadTracks = async (files) => {
+		const list = $('#music-uploads');
+		for (const file of files) {
+			const ext = extension(file.name);
+			const row = uploadRow(list, file.name);
+			if (!AUDIO_EXTS.includes(ext)) {
+				row.fail('Not an audio file this server accepts.');
+				continue;
+			}
+			const name = tidyName(file.name);
+			if (state.tracks.some((t) => t.name === name) && !confirm(`"${name}" is already on the server. Replace it?`)) {
+				row.fail('Skipped.');
+				continue;
+			}
+			try {
+				// eslint-disable-next-line no-await-in-loop
+				await upload(`/api/music/${encodeURIComponent(name)}`, file, row.progress);
+				row.done(name === file.name ? 'Uploaded.' : `Uploaded as ${name}.`);
+			} catch (error) {
+				row.fail(error.message);
+			}
+		}
+		await loadTracks().catch(() => {});
+		renderMusic();
+		renderCounts();
+	};
+
+	// --- Ticker --------------------------------------------------------------
+
+	const renderTickerPreview = () => {
+		const lines = state.manifest.ticker.filter((t) => t.enabled !== false && (t.text ?? '').trim());
+		const text = lines.map((t) => t.text.trim()).join('     ✦     ');
+		const node = $('#ticker-preview-text');
+		node.textContent = text || 'No enabled ticker lines';
+		node.style.animationDuration = `${Math.max(12, chars(text) * 0.18)}s`;
+	};
+
+	const renderTicker = () => {
+		const list = $('#ticker-list');
+		const items = state.manifest.ticker;
+		renderTickerPreview();
+		if (!items.length) {
+			list.replaceChildren(emptyNote('No ticker lines yet.'));
+			return;
+		}
+		list.replaceChildren(...items.map((item, index) => {
+			const count = h('span', { class: 'counter' });
+			counter(count, item.text, LIMITS.tickerText);
+			const input = h('input', {
+				type: 'text', value: item.text ?? '', maxLength: LIMITS.tickerText,
+				'aria-label': `Ticker line ${index + 1}`, autocomplete: 'off',
+				oninput: (event) => {
+					item.text = event.target.value;
+					counter(count, item.text, LIMITS.tickerText);
+					renderTickerPreview();
+					markDirty();
+				},
+			});
+			return h('li', { class: `item${item.enabled === false ? ' off' : ''}`, dataset: { id: item.id } },
+				h('div', { class: 'ticker-row grow' },
+					h('div', { class: 'text-cell' }, input, count)),
+				h('div', { class: 'actions' },
+					enabledToggle(item, 'On', renderTicker),
+					...orderButtons(items, index, renderTicker),
+					h('button', {
+						class: 'btn small danger', type: 'button', text: 'Delete', 'aria-label': `Delete ticker line ${index + 1}`,
+						onclick: () => {
+							items.splice(index, 1);
+							markDirty();
+							renderTicker();
+						},
+					})));
+		}));
+	};
+
+	// --- Cards ---------------------------------------------------------------
+
+	const renderCardList = () => {
+		const list = $('#card-list');
+		const items = state.manifest.cards;
+		if (!items.length) {
+			list.replaceChildren(emptyNote('No ad cards yet. Make one with New card.'));
+			return;
+		}
+		list.replaceChildren(...items.map((card, index) => h('li', {
+			class: `item${card.enabled === false ? ' off' : ''}`, dataset: { id: card.id },
+		},
+		h('span', { class: `swatch theme-${THEMES.some((t) => t.id === card.theme) ? card.theme : DEFAULTS.theme}`, 'aria-hidden': 'true' }),
+		h('div', { class: 'grow' },
+			h('div', { class: 'title', text: card.business || 'Untitled card' }),
+			h('div', { class: 'meta', text: [card.headline, card.phone, `${card.seconds ?? DEFAULTS.seconds}s`, card.image ? 'image' : null].filter(Boolean).join(' · ') })),
+		h('div', { class: 'actions' },
+			enabledToggle(card, 'On', renderCardList),
+			...orderButtons(items, index, renderCardList),
+			h('button', { class: 'btn small', type: 'button', text: 'Edit', onclick: () => openEditor(card.id) }),
+			h('button', {
+				class: 'btn small danger', type: 'button', text: 'Delete', 'aria-label': `Delete card ${card.business || index + 1}`,
+				onclick: () => {
+					if (!confirm(`Delete the card "${card.business || 'Untitled'}"?`)) return;
+					items.splice(index, 1);
+					if (card.image) state.pendingDeletes.add(card.image);
+					markDirty();
+					renderCardList();
+				},
+			})))));
+	};
+
+	const buildPreview = (card) => {
+		const theme = THEMES.some((t) => t.id === card.theme) ? card.theme : DEFAULTS.theme;
+		const mode = card.imageMode === 'full' ? 'full' : 'beside';
+		const imageUrl = adUrl(card.image);
+		const lines = (card.lines ?? []).filter((l) => (l ?? '').trim());
+		return h('div', { class: `ad theme-${theme} mode-${mode}` },
+			h('div', { class: `ad-head${card.business ? '' : ' placeholder'}`, text: card.business || 'Business name' }),
+			h('div', { class: 'ad-main' },
+				imageUrl ? h('div', { class: 'ad-image' }, h('img', { src: imageUrl, alt: '' })) : null,
+				h('div', { class: 'ad-text' },
+					card.headline ? h('div', { class: 'ad-headline', text: card.headline }) : null,
+					lines.length ? h('div', { class: 'ad-lines' }, lines.map((l) => h('div', { text: l }))) : null,
+					card.phone ? h('div', { class: 'ad-phone', text: card.phone }) : null)),
+			h('div', { class: 'ad-foot', text: card.footer ?? '' }));
+	};
+
+	const editingCard = () => state.manifest.cards.find((c) => c.id === state.editing);
+
+	const renderPreview = () => {
+		const card = editingCard();
+		if (!card) return;
+		$('#card-preview').replaceChildren(buildPreview(card));
+		$('#preview-note').textContent = `${card.seconds ?? DEFAULTS.seconds} seconds${card.enabled === false ? ' · hidden' : ''}`;
+	};
+
+	const renderImageField = (card) => {
+		const thumb = $('#f-image-thumb');
+		const url = adUrl(card.image);
+		thumb.hidden = !url;
+		if (url) thumb.src = url; else thumb.removeAttribute('src');
+		$('#f-image-name').textContent = card.image ? card.image.split('/').pop() : 'No image';
+		$('#f-image-remove').disabled = !card.image;
+	};
+
+	const openEditor = (id) => {
+		const card = state.manifest.cards.find((c) => c.id === id);
+		if (!card) return;
+		state.editing = id;
+		$('#editor-title').textContent = card.business ? `Edit “${card.business}”` : 'New card';
+		for (const input of $$('#card-form [data-field]')) {
+			const key = input.dataset.field;
+			input.value = card[key] ?? '';
+			counter($(`[data-counter="${key}"]`), input.value, Number(input.maxLength));
+		}
+		for (const input of $$('#card-form [data-line]')) {
+			input.value = card.lines?.[Number(input.dataset.line)] ?? '';
+		}
+		for (const radio of $$('#f-theme input')) radio.checked = radio.value === (card.theme ?? DEFAULTS.theme);
+		for (const radio of $$('input[name="imageMode"]')) radio.checked = radio.value === (card.imageMode ?? DEFAULTS.imageMode);
+		$('#f-seconds').value = String(card.seconds ?? DEFAULTS.seconds);
+		$('#f-seconds-out').textContent = String(card.seconds ?? DEFAULTS.seconds);
+		$('#f-enabled').checked = card.enabled !== false;
+		$('#f-image-error').hidden = true;
+		$('#f-image-progress').hidden = true;
+		renderImageField(card);
+		renderPreview();
+		$('#cards-index').hidden = true;
+		$('#card-editor').hidden = false;
+		window.scrollTo({ top: 0 });
+		$('#f-business').focus();
+	};
+
+	const closeEditor = () => {
+		const id = state.editing;
+		state.editing = null;
+		$('#card-editor').hidden = true;
+		$('#cards-index').hidden = false;
+		renderCardList();
+		$$('#card-list [data-id]').find((n) => n.dataset.id === id)?.querySelector('button:not([data-action])')?.focus();
+	};
+
+	const bindEditor = () => {
+		const swatches = $('#f-theme');
+		swatches.replaceChildren(...THEMES.map((theme) => h('label', {},
+			h('input', { type: 'radio', name: 'theme', value: theme.id }),
+			h('span', { class: `swatch theme-${theme.id}`, 'aria-hidden': 'true' }),
+			theme.label)));
+
+		const onEdit = (target) => {
+			const card = editingCard();
+			if (!card) return;
+			if (target.dataset.field) {
+				card[target.dataset.field] = target.value;
+				counter($(`[data-counter="${target.dataset.field}"]`), target.value, Number(target.maxLength));
+				if (target.dataset.field === 'business') {
+					$('#editor-title').textContent = target.value ? `Edit “${target.value}”` : 'New card';
+				}
+			} else if (target.dataset.line !== undefined) {
+				// The four inputs are the source of truth, so a blank line in the middle
+				// never shifts what the others hold.
+				card.lines = $$('#card-form [data-line]').map((input) => input.value);
+			} else if (target.name === 'theme' || target.name === 'imageMode') {
+				card[target.name] = target.value;
+			} else if (target.id === 'f-seconds') {
+				card.seconds = Number(target.value);
+				$('#f-seconds-out').textContent = target.value;
+			} else if (target.id === 'f-enabled') {
+				card.enabled = target.checked;
+			} else {
+				return;
+			}
+			markDirty();
+			renderPreview();
+		};
+		const isChoice = (target) => target.type === 'checkbox' || target.type === 'radio';
+		$('#card-form').addEventListener('submit', (event) => event.preventDefault());
+		$('#card-form').addEventListener('input', (event) => {
+			if (!isChoice(event.target)) onEdit(event.target);
+		});
+		$('#card-form').addEventListener('change', (event) => {
+			if (isChoice(event.target)) onEdit(event.target);
+		});
+
+		$('#f-image').addEventListener('change', async (event) => {
+			const file = event.target.files?.[0];
+			event.target.value = '';
+			const card = editingCard();
+			if (!file || !card) return;
+			const error = $('#f-image-error');
+			error.hidden = true;
+			const ext = IMAGE_TYPES[extension(file.name)] ?? IMAGE_TYPES[file.type];
+			if (!ext) {
+				error.textContent = 'Use a PNG, JPEG, GIF or WebP image.';
+				error.hidden = false;
+				return;
+			}
+			const name = `${card.id}-${stamp()}.${ext}`;
+			const progress = $('#f-image-progress');
+			progress.value = 0;
+			progress.hidden = false;
+			try {
+				await upload(`/api/ads/images/${encodeURIComponent(name)}`, file, (f) => { progress.value = f; });
+				if (card.image) state.pendingDeletes.add(card.image);
+				card.image = `ads/images/${name}`;
+				state.pendingDeletes.delete(card.image);
+				markDirty();
+				renderImageField(card);
+				renderPreview();
+				loadFiles().then(renderFiles).catch(() => {});
+			} catch (failure) {
+				error.textContent = failure.message;
+				error.hidden = false;
+			} finally {
+				progress.hidden = true;
+			}
+		});
+
+		$('#f-image-remove').addEventListener('click', () => {
+			const card = editingCard();
+			if (!card?.image) return;
+			state.pendingDeletes.add(card.image);
+			delete card.image;
+			markDirty();
+			renderImageField(card);
+			renderPreview();
+		});
+
+		$('#editor-done').addEventListener('click', closeEditor);
+
+		$('#card-new').addEventListener('click', () => {
+			const card = {
+				id: randomId('c'), business: '', imageMode: DEFAULTS.imageMode,
+				theme: DEFAULTS.theme, seconds: DEFAULTS.seconds, enabled: true,
+			};
+			state.manifest.cards.push(card);
+			markDirty();
+			openEditor(card.id);
+		});
+	};
+
+	// --- Clips ---------------------------------------------------------------
+
+	const renderClips = () => {
+		const list = $('#clip-list');
+		const items = state.manifest.clips;
+		if (!items.length) {
+			list.replaceChildren(emptyNote('No clips yet. Upload one above.'));
+			return;
+		}
+		list.replaceChildren(...items.map((clip, index) => {
+			const count = h('span', { class: 'counter' });
+			counter(count, clip.title, LIMITS.clipTitle);
+			const fileUrl = adUrl(clip.file);
+			let video = null;
+			const row = h('li', { class: `item${clip.enabled === false ? ' off' : ''}`, dataset: { id: clip.id } },
+				h('div', { class: 'grow' },
+					h('div', { class: 'text-cell' },
+						h('input', {
+							type: 'text', value: clip.title ?? '', maxLength: LIMITS.clipTitle, placeholder: 'Title',
+							'aria-label': `Title of clip ${index + 1}`, autocomplete: 'off',
+							oninput: (event) => {
+								clip.title = event.target.value;
+								counter(count, clip.title, LIMITS.clipTitle);
+								markDirty();
+							},
+						}),
+						count),
+					h('div', { class: 'meta', text: (clip.file ?? '').split('/').pop() })),
+				h('div', { class: 'actions' },
+					enabledToggle(clip, 'On', renderClips),
+					...orderButtons(items, index, renderClips),
+					h('button', {
+						class: 'btn small', type: 'button', text: 'Preview', disabled: !fileUrl,
+						onclick: (event) => {
+							if (video) {
+								video.remove();
+								video = null;
+								event.target.textContent = 'Preview';
+								return;
+							}
+							video = h('video', { src: fileUrl, controls: true, preload: 'metadata', playsInline: true });
+							row.append(video);
+							event.target.textContent = 'Hide';
+						},
+					}),
+					h('button', {
+						class: 'btn small danger', type: 'button', text: 'Delete', 'aria-label': `Delete clip ${clip.title || index + 1}`,
+						onclick: () => {
+							if (!confirm(`Remove the clip "${clip.title || clip.file}"? Its file is deleted when you save.`)) return;
+							items.splice(index, 1);
+							if (clip.file) state.pendingDeletes.add(clip.file);
+							markDirty();
+							renderClips();
+						},
+					})));
+			return row;
+		}));
+	};
+
+	const uploadClips = async (files) => {
+		const list = $('#clip-uploads');
+		for (const file of files) {
+			const row = uploadRow(list, file.name);
+			const ext = CLIP_TYPES[extension(file.name)] ?? CLIP_TYPES[file.type];
+			if (!ext) {
+				row.fail('Use an MP4, M4V or MOV file.');
+				continue;
+			}
+			const id = randomId('v');
+			const name = `${id}-${stamp()}.${ext}`;
+			try {
+				// eslint-disable-next-line no-await-in-loop
+				await upload(`/api/ads/clips/${encodeURIComponent(name)}`, file, row.progress);
+				const title = file.name.replace(/\.[^.]+$/, '').slice(0, LIMITS.clipTitle);
+				state.manifest.clips.push({ id, title, file: `ads/clips/${name}`, enabled: true });
+				markDirty();
+				row.done('Uploaded. Press Save to publish it.');
+			} catch (error) {
+				row.fail(error.message);
+			}
+		}
+		renderClips();
+		loadFiles().then(renderFiles).catch(() => {});
+	};
+
+	// --- Files ---------------------------------------------------------------
+
+	const renderFileList = (selector, files, kind) => {
+		const list = $(selector);
+		if (!files.length) {
+			list.replaceChildren(emptyNote(kind === 'image' ? 'No images on the server.' : 'No clips on the server.'));
+			return;
+		}
+		list.replaceChildren(...files.map((file) => {
+			const used = isReferenced(file.path);
+			return h('li', { class: 'item' },
+				h('div', { class: 'grow' },
+					h('div', { class: 'title', text: file.name }),
+					h('div', { class: 'meta' }, formatBytes(file.size), ' ',
+						h('span', { class: `badge ${used ? 'on' : 'warn'}`, text: used ? 'In use' : 'Unused' }))),
+				h('div', { class: 'actions' },
+					h('a', { class: 'btn small', href: adUrl(file.path), target: '_blank', rel: 'noopener', text: 'Open' }),
+					h('button', {
+						class: 'btn small danger', type: 'button', text: 'Delete', disabled: used,
+						title: used ? 'Remove it from every card or clip first' : 'Delete this file',
+						onclick: async () => {
+							if (!confirm(`Delete ${file.name} from the server?`)) return;
+							try {
+								await api('DELETE', `/api/${encodePath(file.path)}`);
+								toast(`Deleted ${file.name}.`);
+							} catch (error) {
+								toast(error.message, true);
+							}
+							await loadFiles().catch(() => {});
+							renderFiles();
+						},
+					})));
+		}));
+	};
+
+	const renderFiles = () => {
+		renderFileList('#files-images', state.files.images, 'image');
+		renderFileList('#files-clips', state.files.clips, 'clip');
+	};
+
+	// --- Everything ----------------------------------------------------------
+
+	const renderAll = () => {
+		renderCounts();
+		renderMusic();
+		renderTicker();
+		if (state.editing && editingCard()) renderPreview(); else renderCardList();
+		renderClips();
+		renderFiles();
+	};
+
+	const enterApp = async () => {
+		await Promise.all([loadManifest(), loadTracks(), loadFiles()]);
+		showView('app');
+		selectTab(location.hash.slice(1));
+		renderAll();
+		renderSaveBar();
+	};
+
+	const bind = () => {
+		$('#login-form').addEventListener('submit', async (event) => {
+			event.preventDefault();
+			const token = $('#login-token').value.trim();
+			const error = $('#login-error');
+			if (!token) {
+				error.textContent = 'Enter the token.';
+				error.hidden = false;
+				return;
+			}
+			state.token = token;
+			try {
+				await enterApp();
+				storage.set(token);
+				$('#login-token').value = '';
+				error.hidden = true;
+			} catch (failure) {
+				if (failure.status !== 401 && failure.status !== 403) {
+					error.textContent = failure.message;
+					error.hidden = false;
+				}
+			}
+		});
+
+		$('#sign-out').addEventListener('click', () => {
+			if (state.dirty && !confirm('You have unsaved changes. Sign out anyway?')) return;
+			state.dirty = false;
+			signOut();
+		});
+
+		for (const button of $$('.tab')) {
+			button.addEventListener('click', () => selectTab(button.dataset.tab));
+			button.addEventListener('keydown', (event) => {
+				const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
+				if (!step) return;
+				event.preventDefault();
+				const next = TABS[(TABS.indexOf(state.tab) + step + TABS.length) % TABS.length];
+				selectTab(next, { focus: true });
+			});
+		}
+
+		$('#music-input').addEventListener('change', (event) => {
+			const files = [...(event.target.files ?? [])];
+			event.target.value = '';
+			if (files.length) uploadTracks(files);
+		});
+
+		$('#clip-input').addEventListener('change', (event) => {
+			const files = [...(event.target.files ?? [])];
+			event.target.value = '';
+			if (files.length) uploadClips(files);
+		});
+
+		const tickerNew = $('#ticker-new');
+		const tickerCount = $('#ticker-new-count');
+		counter(tickerCount, '', LIMITS.tickerText);
+		tickerNew.addEventListener('input', () => counter(tickerCount, tickerNew.value, LIMITS.tickerText));
+		$('#ticker-add').addEventListener('submit', (event) => {
+			event.preventDefault();
+			const text = tickerNew.value.trim();
+			if (!text) return;
+			state.manifest.ticker.push({ id: randomId('t'), text, enabled: true });
+			tickerNew.value = '';
+			counter(tickerCount, '', LIMITS.tickerText);
+			markDirty();
+			renderTicker();
+			tickerNew.focus();
+		});
+
+		bindEditor();
+
+		$('#save').addEventListener('click', save);
+		document.addEventListener('keydown', (event) => {
+			if ((event.metaKey || event.ctrlKey) && event.key === 's' && !$('#view-app').hidden) {
+				event.preventDefault();
+				if (state.dirty) save();
+			}
+		});
+		window.addEventListener('beforeunload', (event) => {
+			if (!state.dirty) return;
+			event.preventDefault();
+			event.returnValue = '';
+		});
+		window.addEventListener('hashchange', () => selectTab(location.hash.slice(1)));
+	};
+
+	const boot = async () => {
+		bind();
+		state.token = storage.get();
+		// Probe without assuming anything: 403 means admin is off on this server,
+		// 401 means sign in, 200 means the stored token still works.
+		let response;
+		try {
+			response = await fetch('/api/ads', {
+				cache: 'no-store',
+				headers: state.token ? { Authorization: `Bearer ${state.token}` } : {},
+			});
+		} catch {
+			$('#view-loading').replaceChildren(h('p', { class: 'error', text: 'Could not reach the server. Reload to try again.' }));
+			return;
+		}
+		const data = await response.json().catch(() => ({}));
+		if (response.status === 403 && data.code === 'admin-disabled') {
+			showView('disabled');
+			return;
+		}
+		if (response.status === 401) {
+			signOut(state.token ? 'Your saved token was not accepted. Sign in again.' : undefined);
+			return;
+		}
+		if (!response.ok) {
+			$('#view-loading').replaceChildren(h('p', { class: 'error', text: data.error || `The server answered ${response.status}.` }));
+			return;
+		}
+		try {
+			await enterApp();
+		} catch (error) {
+			if (error.status !== 401 && error.status !== 403) toast(error.message, true);
+		}
+	};
+
+	boot();
+})();
+</script>
+</body>
+</html>

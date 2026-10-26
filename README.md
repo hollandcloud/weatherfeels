@@ -276,7 +276,10 @@ file host work too.
 ### Companion server
 
 A dependency-free Node server is included, so it runs on a NAS or a Raspberry Pi
-with no install step:
+with no install step. Besides music it can hold ticker ad lines, full-screen local ad
+cards and a video clip reel, all managed from a web page at `/admin`, and it ships with
+a Dockerfile, a Compose file and a systemd unit. **[server/README.md](server/README.md)**
+has the full guide; the short version:
 
 ```bash
 cd server

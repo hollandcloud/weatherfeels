@@ -1,0 +1,3 @@
+# The admin token for docker compose lives here; it must never be committed.
+.env
+node_modules/

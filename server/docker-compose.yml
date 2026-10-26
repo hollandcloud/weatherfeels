@@ -1,0 +1,37 @@
+# weatherfeels companion server
+#
+# Put the admin token in a `.env` file beside this one (never commit it):
+#
+#   echo "WS4K_TOKEN=$(openssl rand -hex 32)" > .env
+#   docker compose up -d
+#
+# Then open http://<this host>:8080/admin and sign in with that token.
+
+name: weatherfeels-companion
+
+services:
+  companion:
+    build: .
+    image: weatherfeels-companion
+    container_name: weatherfeels-companion
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Required: without it compose refuses to start, rather than run with
+      # admin switched off by accident.
+      WS4K_TOKEN: ${WS4K_TOKEN:?Set WS4K_TOKEN in .env, e.g. WS4K_TOKEN=$(openssl rand -hex 32)}
+      # Largest upload accepted, in MB. Raise it for long clips.
+      WS4K_MAX_UPLOAD_MB: ${WS4K_MAX_UPLOAD_MB:-500}
+    volumes:
+      # Named volumes take their owner from the image, so they just work. To use
+      # folders on the host instead (handy on a NAS), swap these for e.g.
+      #   - /volume1/media/weatherfeels/music:/data/music
+      #   - /volume1/media/weatherfeels/ads:/data/ads
+      # and make those folders writable by uid 1000: chown -R 1000:1000 <folder>
+      - music:/data/music
+      - ads:/data/ads
+
+volumes:
+  music:
+  ads:
