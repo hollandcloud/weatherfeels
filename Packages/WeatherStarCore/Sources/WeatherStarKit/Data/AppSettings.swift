@@ -180,6 +180,9 @@ public final class AppSettings {
         #else
         burnInProtection = defaults.bool(forKey: Key.burnInProtection, default: false)
         #endif
+        bulletinsEnabled = defaults.bool(forKey: Key.bulletinsEnabled, default: true)
+        bulletinTone = defaults.bool(forKey: Key.bulletinTone, default: true)
+        shownBulletinIDs = defaults.stringArray(forKey: Key.shownBulletins) ?? []
         enabledDisplayIDs = Set(
             defaults.stringArray(forKey: Key.enabledDisplays)
                 ?? DisplayIdentifier.defaultEnabled.map(\.rawValue)
@@ -237,6 +240,34 @@ public final class AppSettings {
     /// logo and clock. See `BurnInShift`.
     public var burnInProtection: Bool {
         didSet { defaults.set(burnInProtection, forKey: Key.burnInProtection) }
+    }
+
+    // MARK: - Weather bulletins
+
+    /// Whether a new warning interrupts the rotation with a full-screen bulletin.
+    ///
+    /// On by default, unlike anything that depends on a server of the user's own: it is the
+    /// NWS's data the app already shows, and a warning is the moment the app is most useful.
+    public var bulletinsEnabled: Bool {
+        didSet { defaults.set(bulletinsEnabled, forKey: Key.bulletinsEnabled) }
+    }
+
+    /// Whether the bulletin sounds its chime.
+    public var bulletinTone: Bool {
+        didSet { defaults.set(bulletinTone, forKey: Key.bulletinTone) }
+    }
+
+    /// Alerts already shown as a bulletin, newest last, so relaunching during a warning does
+    /// not interrupt for the same one again.
+    public private(set) var shownBulletinIDs: [String] {
+        didSet { defaults.set(shownBulletinIDs, forKey: Key.shownBulletins) }
+    }
+
+    /// Remember a bulletin as shown. Keeps the last fifty: a warning outlives few refreshes,
+    /// and a handful of busy days should not grow the preferences file without bound.
+    public func rememberBulletin(_ id: String) {
+        guard !shownBulletinIDs.contains(id) else { return }
+        shownBulletinIDs = Array((shownBulletinIDs + [id]).suffix(50))
     }
 
     // Clamped properties use a private store plus a computed accessor rather than
@@ -393,6 +424,9 @@ private enum Key {
     static let remoteMusicURL = prefix + "remoteMusicURL"
     static let uploadPath = prefix + "uploadPath"
     static let uploadToken = prefix + "uploadToken"
+    static let bulletinsEnabled = prefix + "bulletinsEnabled"
+    static let bulletinTone = prefix + "bulletinTone"
+    static let shownBulletins = prefix + "shownBulletins"
 }
 
 /// A place the user has chosen to show weather for.

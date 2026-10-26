@@ -92,6 +92,25 @@ Natural Earth release. The towns around you are named, nearest first, without co
 `RadarMapTests` checks registration against the world rather than against our own
 arithmetic: inland Orlando must render as land, and the Gulf and Lake Okeechobee as water.
 
+### Weather bulletins
+
+When the National Weather Service issues a *warning* for your location — or anything it
+grades Extreme — the rotation is interrupted the way the WeatherStar's was: a red
+full-screen bulletin with the warning's own text (where the storm is, where it is going,
+what to do), scrolling at a reading pace, then the Hazards display. Watches, advisories and
+statements stay on Hazards and the red ticker without interrupting; breaking in for a Wind
+Advisory would teach people to ignore the bulletin before the day it matters.
+
+A warning switches the set on if it is in standby, and a bulletin already shown is
+remembered across launches so it does not interrupt twice. Both bulletins and their chime
+can be turned off in Settings.
+
+The chime is synthesised by `Tools/MakeSounds.py`, and deliberately is not either broadcast
+alert tone: the Emergency Alert System's 853 + 960 Hz attention signal, whose use outside
+a real alert is restricted, or NOAA Weather Radio's 1050 Hz tone, which can set off a
+weather radio in the same room. `BulletinTests` measures the generated file to hold it to
+that. Debug builds show a sample bulletin at launch with `WS4K_TEST_BULLETIN` set.
+
 ### A zoomable radar map beside it
 
 The WeatherStar "Local Radar" is the authentic display. On iPhone, iPad and Mac there is

@@ -51,6 +51,7 @@ public struct SettingsView: View {
                 locationSection
                 displaySection
                 rotationSection
+                bulletinSection
                 musicSection
                 aboutSection
             }
@@ -273,6 +274,27 @@ public struct SettingsView: View {
             Text("Displays in rotation")
         } footer: {
             Text("Displays with no data for your location are skipped automatically.")
+        }
+    }
+
+    // MARK: - Weather bulletins
+
+    private var bulletinSection: some View {
+        Section {
+            Toggle("Interrupt for warnings", isOn: bind(\.bulletinsEnabled))
+            Toggle("Play the bulletin chime", isOn: bind(\.bulletinTone))
+                .disabled(!settings.bulletinsEnabled)
+        } header: {
+            Text("Weather bulletins")
+        } footer: {
+            Text(
+                """
+                When the National Weather Service issues a warning for your location, it \
+                breaks into the rotation with the full text, then shows Hazards. Watches and \
+                advisories appear on Hazards without interrupting. A warning also switches the \
+                set on if it is in standby.
+                """
+            )
         }
     }
 

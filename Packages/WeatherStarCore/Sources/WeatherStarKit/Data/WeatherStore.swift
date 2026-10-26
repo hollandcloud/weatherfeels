@@ -32,6 +32,8 @@ public final class WeatherStore {
     public private(set) var extendedDays: [ExtendedDay] = []
     public private(set) var almanac: AlmanacData?
     public private(set) var hazards: [HazardItem] = []
+    /// Warnings waiting to be shown as a bulletin, most severe first.
+    public private(set) var pendingBulletins: [WeatherBulletin] = []
     public private(set) var scroll: ScrollContent?
     public private(set) var spcOutlook: SPCOutlookData?
     public private(set) var radar: RadarData?
@@ -713,6 +715,55 @@ public final class WeatherStore {
 
     // MARK: - Hazards
 
+    /// Queue any warning not yet shown as a bulletin.
+    ///
+    /// Only queued here; it is marked as shown when it is taken for display, so one that
+    /// arrives while the app is in the background is still shown on return.
+    private func queueBulletins(from alerts: [AlertFeature]) {
+        guard settings.bulletinsEnabled else {
+            pendingBulletins = []
+            return
+        }
+        let current = alerts.compactMap(WeatherBulletin.init(alert:))
+        let alreadyQueued = Set(pendingBulletins.map(\.id))
+        let fresh = WeatherBulletin.unseen(current, shown: Set(settings.shownBulletinIDs))
+            .filter { !alreadyQueued.contains($0.id) }
+        // A queued bulletin whose alert has since been withdrawn is no longer news.
+        let stillActive = Set(current.map(\.id))
+        pendingBulletins = pendingBulletins.filter { stillActive.contains($0.id) } + fresh
+    }
+
+    #if DEBUG
+    /// Queue a sample warning, for checking the bulletin on a simulator without waiting for
+    /// the weather. Debug builds only; set `WS4K_TEST_BULLETIN` in the launch environment.
+    public func queueSampleBulletin() {
+        pendingBulletins.append(WeatherBulletin(
+            id: "sample-\(UUID().uuidString)",
+            event: "Severe Thunderstorm Warning",
+            headline: "Severe Thunderstorm Warning issued October 26 at 1:42PM EDT until 2:30PM EDT by NWS Tampa Bay Ruskin FL",
+            text: """
+            At 142 PM EDT, a severe thunderstorm was located near Plant City, moving east at 25 mph.
+
+            HAZARD...60 mph wind gusts and penny size hail.
+
+            SOURCE...Radar indicated.
+
+            IMPACT...Expect damage to roofs, siding, and trees.
+
+            For your protection move to an interior room on the lowest floor of a building.
+            """
+        ))
+    }
+    #endif
+
+    /// Take the next bulletin to show, and remember it as shown.
+    public func takeBulletin() -> WeatherBulletin? {
+        guard !pendingBulletins.isEmpty else { return nil }
+        let bulletin = pendingBulletins.removeFirst()
+        settings.rememberBulletin(bulletin.id)
+        return bulletin
+    }
+
     private func loadHazards(_ parameters: WeatherParameters) async {
         engine.setStatus(.loading, for: .hazards)
 
@@ -728,8 +779,10 @@ public final class WeatherStore {
             return
         }
 
-        hazards = collection.features
-            .sorted { $0.severityRank < $1.severityRank }
+        let ranked = collection.features.sorted { $0.severityRank < $1.severityRank }
+        queueBulletins(from: ranked)
+
+        hazards = ranked
             .map { alert in
                 HazardItem(
                     id: alert.id,
