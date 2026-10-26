@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 import WeatherStarKit
 
@@ -129,12 +130,16 @@ public struct WeatherStarView: View {
     /// A local ad card in an ad break, with its image if it has one.
     private let adCard: (card: AdCard, image: CGImage?)?
 
+    /// A clip from the reel playing in an ad break.
+    private let clipPlayer: AVPlayer?
+
     public init(
         isPictureOn: Bool = true,
         showsCabinetControls: Bool = true,
         bulletin: (bulletin: WeatherBulletin, shownAt: Date)? = nil,
         showsEightsBumper: Bool = false,
         adCard: (card: AdCard, image: CGImage?)? = nil,
+        clipPlayer: AVPlayer? = nil,
         onOpenSettings: @escaping () -> Void = {},
         onPower: @escaping () -> Void = {}
     ) {
@@ -143,6 +148,7 @@ public struct WeatherStarView: View {
         self.bulletin = bulletin
         self.showsEightsBumper = showsEightsBumper
         self.adCard = adCard
+        self.clipPlayer = clipPlayer
         self.onOpenSettings = onOpenSettings
         self.onPower = onPower
     }
@@ -281,6 +287,23 @@ public struct WeatherStarView: View {
         .background(Color.black)
         .crtEffect(tubeSettings(metrics: metrics), size: size)
         .scanlineEffect(shaderLineSettings, size: size)
+        // After the effects, not inside them: the video is a platform layer, and the tube is
+        // a Metal layer effect that SwiftUI cannot run over one. The drawn scanlines go back
+        // on top so a clip still reads as this set's picture.
+        .overlay {
+            if let clipPlayer {
+                ZStack {
+                    ClipVideoView(player: clipPlayer)
+                    Scanlines(mode: settings.scanlines, animated: false)
+                        .environment(\.starMetrics, metrics)
+                        .frame(width: metrics.scaledSize.width, height: metrics.scaledSize.height)
+                        .allowsHitTesting(false)
+                }
+                .frame(width: size.width, height: size.height)
+                .background(Color.black)
+                .accessibilityLabel("Commercial")
+            }
+        }
     }
 
     /// Step the burn-in offset on a wall-clock schedule.

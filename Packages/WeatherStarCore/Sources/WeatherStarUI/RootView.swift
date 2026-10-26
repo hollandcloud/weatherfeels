@@ -62,6 +62,12 @@ public struct RootView: View {
     @State private var showsEightsBumper = false
     /// The ad card on screen in an ad break, with its image.
     @State private var adCard: (card: AdCard, image: CGImage?)?
+    /// A clip from the reel playing in an ad break.
+    @State private var clip: ClipPlayback?
+    /// What the last break showed, so cards and clips take turns.
+    @State private var lastBreakKind: AdBreaks.Kind?
+    /// Which clip the next clip break plays; the reel goes round in order.
+    @State private var nextClipIndex = 0
     @State private var adBreakEnd: Task<Void, Never>?
     /// Displays shown since the last ad break.
     @State private var displaysSinceBreak = 0
@@ -196,6 +202,7 @@ public struct RootView: View {
                     bulletin: bulletin,
                     showsEightsBumper: showsEightsBumper,
                     adCard: adCard,
+                    clipPlayer: clip?.player,
                     onOpenSettings: { isShowingSettings = true },
                     onPower: togglePower
                 )
@@ -235,7 +242,7 @@ public struct RootView: View {
         .onTapGesture {
             if bulletin != nil {
                 dismissBulletin()
-            } else if adCard != nil {
+            } else if adCard != nil || clip != nil {
                 endAdBreak()
             } else {
                 isShowingControls ? hideControls() : showControls()
@@ -319,6 +326,7 @@ public struct RootView: View {
                 bulletin: bulletin,
                 showsEightsBumper: showsEightsBumper,
                 adCard: adCard,
+                clipPlayer: clip?.player,
                 onOpenSettings: { isShowingSettings = true },
                 onPower: togglePower
             )
@@ -533,7 +541,7 @@ public struct RootView: View {
     }
 
     private func applyMusicState() {
-        if MusicGate.shouldPlay(musicEnabled: settings.musicEnabled, isSetOn: isPictureOn) {
+        if MusicGate.shouldPlay(musicEnabled: settings.musicEnabled, isSetOn: isPictureOn, clipPlaying: clip != nil) {
             musicPlayer.play()
         } else {
             musicPlayer.pause()
@@ -614,7 +622,7 @@ public struct RootView: View {
         guard bulletin == nil, isSceneActive, let next = store.takeBulletin() else { return }
         if !isPictureOn { togglePower() }
         hideControls()
-        if adCard != nil { endAdBreak() }
+        if adCard != nil || clip != nil { endAdBreak() }
         bulletin = (next, Date())
         if settings.bulletinTone { soundEffects.play(.bulletin) }
 
@@ -672,7 +680,12 @@ public struct RootView: View {
     /// Take an ad break if one is due, there is something to show, and nothing outranks it.
     private func considerAdBreak() {
         let cards = settings.adCardsEnabled ? ads.manifest.cards : []
-        guard !cards.isEmpty, adCard == nil else { return }
+        let clips = settings.clipReelEnabled ? ads.manifest.clips : []
+        guard adCard == nil, clip == nil,
+              let kind = AdBreaks.nextKind(
+                  cardsAvailable: !cards.isEmpty, clipsAvailable: !clips.isEmpty, last: lastBreakKind
+              )
+        else { return }
         let conditions = AdBreaks.Conditions(
             sceneIsActive: isSceneActive,
             pictureIsOn: isPictureOn,
@@ -684,16 +697,30 @@ public struct RootView: View {
             displaysSinceBreak: displaysSinceBreak, every: settings.adBreakEvery, conditions: conditions
         ) else { return }
 
-        let card = cards[nextCardIndex % cards.count]
-        nextCardIndex += 1
         hideControls()
         engine.isSuspended = true
-        adCard = (card, ads.cardImages[card.id])
-        adBreakEnd?.cancel()
-        adBreakEnd = Task {
-            try? await Task.sleep(for: .seconds(card.seconds))
-            guard !Task.isCancelled else { return }
-            endAdBreak()
+        lastBreakKind = kind
+
+        switch kind {
+        case .card:
+            let card = cards[nextCardIndex % cards.count]
+            nextCardIndex += 1
+            adCard = (card, ads.cardImages[card.id])
+            adBreakEnd?.cancel()
+            adBreakEnd = Task {
+                try? await Task.sleep(for: .seconds(card.seconds))
+                guard !Task.isCancelled else { return }
+                endAdBreak()
+            }
+        case .clip:
+            let next = clips[nextClipIndex % clips.count]
+            nextClipIndex += 1
+            // The clip has the floor: the music steps back through its gate, and comes
+            // back the same way when the clip is done.
+            clip = ClipPlayback(clip: next, volume: Float(settings.musicVolume)) {
+                endAdBreak()
+            }
+            applyMusicState()
         }
     }
 
@@ -702,6 +729,11 @@ public struct RootView: View {
         adBreakEnd?.cancel()
         adBreakEnd = nil
         adCard = nil
+        if let playing = clip {
+            playing.stop()
+            clip = nil
+            applyMusicState()
+        }
         displaysSinceBreak = 0
         engine.isSuspended = false
     }

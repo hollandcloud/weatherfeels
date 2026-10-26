@@ -330,12 +330,14 @@ public struct SettingsView: View {
 
             Toggle("Local ad cards", isOn: bind(\.adCardsEnabled))
                 .disabled(!hasServer)
+            Toggle("Clip reel", isOn: bind(\.clipReelEnabled))
+                .disabled(!hasServer)
             Picker("Ad break every", selection: bind(\.adBreakEvery)) {
                 ForEach(AdBreaks.intervals, id: \.self) { count in
                     Text("\(count) displays").tag(count)
                 }
             }
-            .disabled(!settings.adCardsEnabled)
+            .disabled(!settings.adCardsEnabled && !settings.clipReelEnabled)
 
             if AdsLibrary.needsServer(settings), hasServer {
                 if let error = ads.lastError {
@@ -356,9 +358,9 @@ public struct SettingsView: View {
         } footer: {
             Text(
                 """
-                Off unless you turn them on. Ticker messages can be typed here; cards come from \
-                your companion server. Nothing is fetched from the server for ads until one of \
-                these is on.
+                Off unless you turn them on. Ticker messages can be typed here; cards and clips \
+                come from your companion server, and take turns when both are on. Nothing is \
+                fetched from the server for ads until one of these is on.
                 """
             )
         }
