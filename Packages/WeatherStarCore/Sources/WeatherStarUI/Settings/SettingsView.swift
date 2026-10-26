@@ -16,8 +16,19 @@ public struct SettingsView: View {
     /// Called when a change requires reloading weather data.
     private let onLocationChange: (SavedLocation) -> Void
 
-    public init(onLocationChange: @escaping (SavedLocation) -> Void) {
+    /// Opens the zoomable radar map, or `nil` where there is none.
+    ///
+    /// Settings is the one control every layout reaches — the cabinet's chin has no room for
+    /// a sixth button on a small phone, and Apple TV has no map — so the map is offered here
+    /// as well as on the floating controls and the control deck.
+    private let onOpenRadarMap: (() -> Void)?
+
+    public init(
+        onLocationChange: @escaping (SavedLocation) -> Void,
+        onOpenRadarMap: (() -> Void)? = nil
+    ) {
         self.onLocationChange = onLocationChange
+        self.onOpenRadarMap = onOpenRadarMap
     }
 
     public var body: some View {
@@ -26,6 +37,17 @@ public struct SettingsView: View {
                 #if os(tvOS)
                 closeSection
                 #endif
+                if let onOpenRadarMap {
+                    Section {
+                        Button {
+                            onOpenRadarMap()
+                        } label: {
+                            Label("Radar map", systemImage: "map")
+                        }
+                    } footer: {
+                        Text("Zoom in on storms over a live map, from NOAA's radar mosaic.")
+                    }
+                }
                 locationSection
                 displaySection
                 rotationSection

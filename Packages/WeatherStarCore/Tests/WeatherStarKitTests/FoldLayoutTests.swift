@@ -240,10 +240,16 @@ struct ControlDeckLayoutTests {
     func transportFitsAcross() {
         let panes = Self.duoPanes + [("narrowest pane", CGSize(width: FoldPosture.minimumPane, height: 669))]
         for (name, size) in panes {
-            let layout = ControlDeckLayout.resolve(size: size, channelCount: Self.allChannels)
-            let perRow = layout.transportRows == 1 ? ControlDeckLayout.transportCount : 3
-            let needed = layout.transportTouch * CGFloat(perRow) + layout.spacing * CGFloat(perRow - 1)
-            #expect(needed <= size.width - layout.margin * 2 + 0.5, "\(name): \(needed)pt needed")
+            // Six buttons, or seven with the radar map.
+            for buttons in [ControlDeckLayout.transportCount, ControlDeckLayout.transportCount + 1] {
+                let layout = ControlDeckLayout.resolve(
+                    size: size, channelCount: Self.allChannels, transportButtons: buttons
+                )
+                let perRow = layout.transportWidestRow
+                let needed = layout.transportTouch * CGFloat(perRow) + layout.spacing * CGFloat(perRow - 1)
+                #expect(layout.transportTouch >= ControlDeckLayout.minimumTouch, "\(name), \(buttons) buttons")
+                #expect(needed <= size.width - layout.margin * 2 + 0.5, "\(name), \(buttons) buttons: \(needed)pt needed")
+            }
         }
     }
 
