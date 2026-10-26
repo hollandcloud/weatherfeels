@@ -63,19 +63,34 @@ from the rotation rather than blanking the screen.
 Hourly, Travel, Hourly Graph and SPC Outlook are off by default, as upstream has
 them. Toggle any of them in Settings.
 
-### Radar is centred on you, unlike upstream
+### Radar: asked for by coordinates, drawn over a vector map
 
-Upstream's `RADAR_OFFSET` is a literal `{x: 240, y: 138}` against a 240×163 crop, which
-places your location at 100% across and 85% down — the bottom-right corner — so the
-window actually shows the area to your north-west. (Its `* 2` in
-`getXYFromLatitudeLongitudeDoppler` is undone by the `/ 2` in `radar-processor.mjs`, so
-the offset really is applied at that scale.) Upstream centres its *base map* via
-`- TILE_SIZE.y / 2` but never the radar window.
+The radar used to be ported from upstream and was wrong in a way that took a long time to
+see. Upstream downloads the whole national `n0r` composite and finds you on it with
+hand-tuned constants, an anchor at 51°N 129.138°W, but IEM's own world file for that image
+puts its corner at 50°N 126°W. Upstream's odd `RADAR_OFFSET` of `{x: 240, y: 138}` happened
+to cancel most of the error. Centring the window, a deliberate fix here, removed the
+cancellation, and from then on "Local Radar" in Tampa showed the weather east of Orlando,
+drawn over a map of Tampa. The base map used the same constants, so the two layers agreed
+with each other, and so did tests that checked the projection against itself.
 
-Here the offset is half the crop, so "Local Radar" means what it says. `RadarFramingTests`
-asserts a spread of locations land near the middle of their own window — with eastern
-Maine flagged as a legitimate exception, since the projection only reaches longitude
-−68.68 and the crop has to clamp inside the composite.
+Now each frame is requested from IEM's time-enabled WMS as a box of coordinates around you:
+the `n0q` composite, which is 8-bit, half-dBZ reflectivity at about half a kilometre, one
+854×367 frame per five-minute step. There is no projection of ours left to get wrong and no
+resampling. Every colour in IEM's table maps to exactly one reflectivity, so frames are
+recoloured by value into the WeatherStar's eight radar colours. The window is 750 km across
+and widened by latitude so it covers the same ground everywhere; the standard canvas shows
+its middle 640 points. Alaska and Hawaii, which the composite does not cover, get no radar
+rather than the nearest corner of the lower 48.
+
+The base map is drawn from [Natural Earth](https://www.naturalearthdata.com/) vectors (coast,
+lakes, national and state borders) in the colours of the raster map it replaced, so it is
+sharp at any size. It uses the same coordinates as the frames, so the two layers register by
+construction. `Tools/MakeRadarMap.py` builds the 159 KB `radarmap.bin` from a pinned
+Natural Earth release. The towns around you are named, nearest first, without collisions.
+
+`RadarMapTests` checks registration against the world rather than against our own
+arithmetic: inland Orlando must render as land, and the Gulf and Lake Okeechobee as water.
 
 ## Screen care on a television
 
@@ -496,6 +511,7 @@ Packages/WeatherStarCore/       Swift package — all logic and UI
   Tests/                        100 tests across 16 suites
 Apps/{iOS,tvOS,macOS}/          thin app targets: @main + Info.plist
 Tools/woff2ttf.py               WOFF → TTF converter (no dependencies)
+Tools/MakeRadarMap.py           builds the radar's vector base map from Natural Earth
 server/                         companion music server
 project.yml                     XcodeGen spec
 ```
@@ -522,7 +538,8 @@ python3 Tools/woff2ttf.py <out_dir> path/to/*.woff
   (MIT). Fonts, weather icons, background artwork, music and the generated
   city/station tables are from that project.
 - Weather data: [NOAA / National Weather Service](https://www.weather.gov/documentation/services-web-api) (public domain).
-- Radar composites: [Iowa Environmental Mesonet](https://mesonet.agron.iastate.edu/).
+- Radar composites: [Iowa Environmental Mesonet](https://mesonet.agron.iastate.edu/) (public domain).
+- Radar base map: [Natural Earth](https://www.naturalearthdata.com/) (public domain).
 - Convective outlooks: [NOAA Storm Prediction Center](https://www.spc.noaa.gov/).
 - Sun and moon math ported from [SunCalc](https://github.com/mourner/suncalc) (BSD-2-Clause).
 

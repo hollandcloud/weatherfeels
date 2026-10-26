@@ -74,8 +74,9 @@ public actor NWSClient {
         }
     }
 
-    /// NWS asks that clients identify themselves with contact information.
-    private static var defaultUserAgent: String {
+    /// NWS asks that clients identify themselves with contact information. Shared with the
+    /// radar requests, which go to IEM and should say who they are in the same way.
+    static var defaultUserAgent: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         return "weatherfeels/\(version) (https://github.com/netbymatt/ws4kp)"
     }
