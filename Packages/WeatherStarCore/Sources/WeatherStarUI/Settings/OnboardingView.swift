@@ -69,6 +69,8 @@ enum OnboardingPalette {
 public struct OnboardingView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(LocationService.self) private var locationService
+    /// Read from `RootView`, which owns the one reading of the fold.
+    @Environment(\.foldPosture) private var fold
 
     /// Called once onboarding is finished, so the host can start loading weather.
     private let onFinish: () -> Void
@@ -115,9 +117,23 @@ public struct OnboardingView: View {
             )
             .ignoresSafeArea()
 
-            content
-                .frame(maxWidth: 820)
-                .padding(.horizontal, 32)
+            if fold.isFolded {
+                // On a bent screen the steps take the pane the hand is nearest — the lower
+                // half of a tabletop, the trailing page of a book — rather than a column
+                // centred on the crease, where the middle of every line would fold away from
+                // the reader and the one button would sit in the hinge.
+                FoldSplit(posture: fold) {
+                    Color.clear
+                } second: { insets in
+                    content
+                        .padding(.horizontal, 24)
+                        .padding(insets)
+                }
+            } else {
+                content
+                    .frame(maxWidth: 820)
+                    .padding(.horizontal, 32)
+            }
         }
         // Pinned dark at the *presentation* level, for the reason `RootView` records on
         // the settings sheet: setting `EnvironmentValues.colorScheme` alone only tells

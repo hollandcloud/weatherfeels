@@ -38,7 +38,12 @@ jobs:
     # GitHub-hosted only, and deliberately not the self-hosted option the sibling iOS repo
     # offers. That repository is private; this one is public, so a fork's pull request could
     # otherwise run arbitrary code on our own Mac. The convenience is not worth the trade.
-    runs-on: macos-26
+    #
+    # The `xcode-27` image, for the iOS 27.1 SDK: an iOS build from anything older runs on
+    # iPhone Duo in a compatibility mode, kept out from under the status bar and camera and
+    # without the fold layouts. tvOS and macOS come along on the same Xcode rather than
+    # splitting the matrix across two images.
+    runs-on: xcode-27
     # Holds the App Store Connect credentials and is restricted to main by a deployment
     # branch policy, so no branch and no fork can reach them even by naming the environment.
     environment: app-store
@@ -63,8 +68,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # By version, for the reason ci.yml gives: what ships should change only in a commit.
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
+        run: sudo xcode-select -s /Applications/Xcode_27.1.app
+
+      # The CRT shader is compiled into every app target, and Xcode 26 and later ship the
+      # Metal compiler separately.
+      - name: Install the Metal toolchain
+        run: xcrun metal --version >/dev/null 2>&1 || xcodebuild -downloadComponent MetalToolchain
 
       - name: Install XcodeGen
         run: brew install xcodegen

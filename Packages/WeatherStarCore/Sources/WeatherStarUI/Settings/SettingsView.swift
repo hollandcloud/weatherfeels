@@ -41,7 +41,7 @@ public struct SettingsView: View {
             #if !os(tvOS)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    doneButton
                 }
             }
             #endif
@@ -49,6 +49,25 @@ public struct SettingsView: View {
     }
 
     // MARK: - Close
+
+    /// The way out of the sheet.
+    ///
+    /// On iOS 26 and later it carries an icon as well as its title. iPhone Duo stands a sheet's
+    /// bars up the side of its outer display, and the system will only place an item there if
+    /// it has an icon to draw — a title-only Done is left out of the bar. Earlier iOS keeps the
+    /// word, which is what its toolbars show for a confirmation.
+    @ViewBuilder
+    private var doneButton: some View {
+        #if os(iOS)
+        if #available(iOS 26, *) {
+            Button("Done", systemImage: "checkmark") { dismiss() }
+        } else {
+            Button("Done") { dismiss() }
+        }
+        #else
+        Button("Done") { dismiss() }
+        #endif
+    }
 
     #if os(tvOS)
     /// The way out of Settings on tvOS, where there is no sheet chrome and Menu does not

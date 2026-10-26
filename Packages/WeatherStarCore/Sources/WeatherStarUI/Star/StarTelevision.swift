@@ -3,9 +3,67 @@ import WeatherStarKit
 
 // The buttons are moulded plastic on every set, including the veneered one — nobody ever
 // cut controls out of wood. At file scope because `StarTelevision` is generic over its
-// picture, and a generic type cannot hold stored static properties.
-private let televisionButtonTop = Color(red: 0.20, green: 0.195, blue: 0.20)
-private let televisionButtonBottom = Color(red: 0.075, green: 0.07, blue: 0.078)
+// picture, and a generic type cannot hold stored static properties. Internal rather than
+// private so the control deck a folded screen shows is pressed from the same plastic.
+let televisionButtonTop = Color(red: 0.20, green: 0.195, blue: 0.20)
+let televisionButtonBottom = Color(red: 0.075, green: 0.07, blue: 0.078)
+
+/// The cabinet's colours, lit from above the way a moulded case sits under room light.
+///
+/// On the finish rather than on `StarTelevision` so the control deck shown on a folded screen
+/// is visibly the same set's front panel, not a new piece of furniture beside it.
+extension TelevisionFinish {
+    var cabinetTop: Color {
+        switch self {
+        case .monitor: Color(red: 0.24, green: 0.23, blue: 0.23)
+        case .woodgrain: Color(red: 0.42, green: 0.25, blue: 0.13)
+        case .black: Color(red: 0.15, green: 0.145, blue: 0.15)
+        }
+    }
+
+    var cabinetBottom: Color {
+        switch self {
+        case .monitor: Color(red: 0.11, green: 0.105, blue: 0.11)
+        case .woodgrain: Color(red: 0.16, green: 0.085, blue: 0.04)
+        case .black: Color(red: 0.035, green: 0.033, blue: 0.038)
+        }
+    }
+
+    /// How much light the maker's mark can carry, which depends what it is stamped into.
+    var plateInk: Color {
+        self == .woodgrain
+            ? Color(red: 0.85, green: 0.72, blue: 0.45).opacity(0.55)
+            : .white.opacity(0.20)
+    }
+}
+
+/// Veneer grain: fine horizontal streaks, deterministic so it never shimmers.
+///
+/// Drawn in a `Canvas` rather than as stacked views because it is one rasterisation of
+/// ~70 lines instead of ~70 views the layout system has to carry around, and it never
+/// changes once drawn.
+struct VeneerGrain: View {
+    var body: some View {
+        Canvas { context, size in
+            let lines = 70
+            for index in 0..<lines {
+                // A cheap deterministic hash, so the streaks look irregular but are
+                // identical on every redraw and on every device.
+                let noise = (sin(Double(index) * 12.9898) * 43758.5453).truncatingRemainder(
+                    dividingBy: 1
+                )
+                let jitter = abs(noise)
+                let y = size.height * (Double(index) + jitter) / Double(lines)
+                let thickness = 0.4 + jitter * 1.6
+                context.fill(
+                    Path(CGRect(x: 0, y: y, width: size.width, height: thickness)),
+                    with: .color(.black.opacity(0.05 + jitter * 0.16))
+                )
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
 
 /// Where the cabinet's parts sit, all derived from one number: the picture's width.
 ///
@@ -69,7 +127,13 @@ public struct TelevisionGeometry: Equatable, Sendable {
 
     /// Fit the largest cabinet that leaves the picture at `pictureAspect` and still fits
     /// inside `container` on both axes.
-    public static func resolve(container: CGSize, pictureAspect: CGFloat) -> TelevisionGeometry {
+    ///
+    /// `showsControls` is false for a set whose buttons are somewhere else — the control deck
+    /// on the facing page of a folded screen — which leaves the whole chin to the speaker and
+    /// the maker's plate.
+    public static func resolve(
+        container: CGSize, pictureAspect: CGFloat, showsControls: Bool = true
+    ) -> TelevisionGeometry {
         let aspect = max(pictureAspect, 0.01)
 
         // Cabinet width is the picture plus a bezel on each side.
@@ -98,10 +162,13 @@ public struct TelevisionGeometry: Equatable, Sendable {
         // over is enough for a maker's plate and a speaker as well.
         let chin = screen.width - bezel * 1.2
         // Preferred spacing, reduced to whatever actually fits.
-        let gaps = CGFloat(buttonCount - 1)
+        let buttons = showsControls ? buttonCount : 0
+        let gaps = CGFloat(max(buttons - 1, 0))
         let usableChin = chin * 0.99
-        let gap = max(0, min(strip * 0.10, (usableChin - touch * CGFloat(buttonCount)) / gaps))
-        let buttonsWidth = touch * CGFloat(buttonCount) + gap * gaps
+        let gap = gaps > 0
+            ? max(0, min(strip * 0.10, (usableChin - touch * CGFloat(buttons)) / gaps))
+            : 0
+        let buttonsWidth = touch * CGFloat(buttons) + gap * gaps
         // Seven slots and the gaps between them.
         let speakerWidth = strip * 0.55
         let showsSpeaker = chin - buttonsWidth > strip * 1.1
@@ -129,13 +196,43 @@ public struct TelevisionGeometry: Equatable, Sendable {
     }
 }
 
-/// Whether the cabinet is drawn at all.
+/// Whether the cabinet is drawn at all, and — once a screen can fold — what is drawn instead.
 ///
 /// Named and shared because two places need the same answer and must not drift: the view
 /// that draws the set, and — on tvOS — the focus plumbing that has to stand aside when the
 /// set is there. A disagreement between them is not a visual bug, it is a remote that
-/// cannot reach anything.
+/// cannot reach anything. The fold raises the same stakes on a phone: the floating controls
+/// standing aside for a control deck that is not there leaves nothing to press.
 public enum TelevisionPresentation {
+    /// What the weather screen is made of, and which part of it carries the controls.
+    public enum Layout: Equatable, Sendable {
+        /// The picture fills the window, and the floating controls appear over it on a tap.
+        case picture
+        /// The set stands on black, and the buttons on its chin are the controls.
+        case cabinet
+        /// The screen is folded: the picture on one side of the crease, the control deck on
+        /// the other.
+        case folded(FoldPosture)
+
+        /// Whether the layout has controls of its own, so the floating ones must stay away.
+        public var hasBuiltInControls: Bool { self != .picture }
+    }
+
+    /// Decide the layout for a window.
+    ///
+    /// A bent fold outranks every other preference, including an explicit canvas choice. The
+    /// crease is physical: a picture drawn across it bends away from the viewer down the
+    /// middle, wherever the user would otherwise like it. Their canvas choice still decides
+    /// the picture's shape inside its half.
+    public static func layout(
+        layoutMode: LayoutMode, showsInLandscape: Bool, container: CGSize, fold: FoldPosture
+    ) -> Layout {
+        if fold.isFolded { return .folded(fold) }
+        return isShowing(
+            layoutMode: layoutMode, showsInLandscape: showsInLandscape, container: container
+        ) ? .cabinet : .picture
+    }
+
     public static func isShowing(
         layoutMode: LayoutMode, showsInLandscape: Bool, container: CGSize
     ) -> Bool {
@@ -194,42 +291,26 @@ public struct StarTelevision<Picture: View>: View {
     private let geometry: TelevisionGeometry
     private let finish: TelevisionFinish
     private let controls: TelevisionControls
+    /// Whether the chin carries the buttons, or only the power lamp.
+    ///
+    /// Off when the set is one page of a folded screen and the control deck on the facing
+    /// page has the buttons: two sets of the same controls a hand's width apart is the thing
+    /// the cabinet exists to avoid. The lamp stays, so the set still says whether it is on.
+    private let showsControls: Bool
     private let picture: Picture
 
     public init(
         geometry: TelevisionGeometry,
         finish: TelevisionFinish = .monitor,
         controls: TelevisionControls = TelevisionControls(),
+        showsControls: Bool = true,
         @ViewBuilder picture: () -> Picture
     ) {
         self.geometry = geometry
         self.finish = finish
         self.controls = controls
+        self.showsControls = showsControls
         self.picture = picture()
-    }
-
-    // The cabinet's colours, lit from above the way a moulded case sits under room light.
-    private var cabinetTop: Color {
-        switch finish {
-        case .monitor: Color(red: 0.24, green: 0.23, blue: 0.23)
-        case .woodgrain: Color(red: 0.42, green: 0.25, blue: 0.13)
-        case .black: Color(red: 0.15, green: 0.145, blue: 0.15)
-        }
-    }
-
-    private var cabinetBottom: Color {
-        switch finish {
-        case .monitor: Color(red: 0.11, green: 0.105, blue: 0.11)
-        case .woodgrain: Color(red: 0.16, green: 0.085, blue: 0.04)
-        case .black: Color(red: 0.035, green: 0.033, blue: 0.038)
-        }
-    }
-
-    /// How much light the maker's mark can carry, which depends what it is stamped into.
-    private var plateInk: Color {
-        finish == .woodgrain
-            ? Color(red: 0.85, green: 0.72, blue: 0.45).opacity(0.55)
-            : .white.opacity(0.20)
     }
 
     public var body: some View {
@@ -287,14 +368,14 @@ public struct StarTelevision<Picture: View>: View {
             RoundedRectangle(cornerRadius: geometry.cabinetCornerRadius, style: .continuous)
                 .fill(
                     LinearGradient(
-                        colors: [cabinetTop, cabinetBottom],
+                        colors: [finish.cabinetTop, finish.cabinetBottom],
                         startPoint: .top,
                         endPoint: .bottom
                     )
                 )
                 .overlay {
                     if finish == .woodgrain {
-                        grain
+                        VeneerGrain()
                             .clipShape(
                                 RoundedRectangle(
                                     cornerRadius: geometry.cabinetCornerRadius,
@@ -330,32 +411,6 @@ public struct StarTelevision<Picture: View>: View {
             .padding(.horizontal, geometry.bezel)
             .padding(.top, geometry.bezel)
         }
-    }
-
-    /// Veneer grain: fine horizontal streaks, deterministic so it never shimmers.
-    ///
-    /// Drawn in a `Canvas` rather than as stacked views because it is one rasterisation of
-    /// ~70 lines instead of ~70 views the layout system has to carry around, and it never
-    /// changes once drawn.
-    private var grain: some View {
-        Canvas { context, size in
-            let lines = 70
-            for index in 0..<lines {
-                // A cheap deterministic hash, so the streaks look irregular but are
-                // identical on every redraw and on every device.
-                let noise = (sin(Double(index) * 12.9898) * 43758.5453).truncatingRemainder(
-                    dividingBy: 1
-                )
-                let jitter = abs(noise)
-                let y = size.height * (Double(index) + jitter) / Double(lines)
-                let thickness = 0.4 + jitter * 1.6
-                context.fill(
-                    Path(CGRect(x: 0, y: y, width: size.width, height: thickness)),
-                    with: .color(.black.opacity(0.05 + jitter * 0.16))
-                )
-            }
-        }
-        .allowsHitTesting(false)
     }
 
     // MARK: - Screen
@@ -417,7 +472,7 @@ public struct StarTelevision<Picture: View>: View {
     private var chin: some View {
         HStack(alignment: .center, spacing: geometry.bezel * 0.5) {
             if geometry.showsPlate {
-                StarBrandingPlate(height: geometry.controlStrip * 0.19, ink: plateInk)
+                StarBrandingPlate(height: geometry.controlStrip * 0.19, ink: finish.plateInk)
             }
 
             Spacer(minLength: 0)
@@ -425,7 +480,12 @@ public struct StarTelevision<Picture: View>: View {
             if geometry.showsSpeaker {
                 speakerGrille
             }
-            buttons
+            if showsControls {
+                buttons
+            } else {
+                indicator(belowButton: false)
+                    .accessibilityHidden(true)
+            }
         }
         .frame(height: geometry.controlStrip)
         .padding(.horizontal, geometry.bezel * 0.6)
@@ -512,7 +572,7 @@ public struct StarTelevision<Picture: View>: View {
                 )
                 .overlay(alignment: .bottom) {
                     if showsIndicator {
-                        indicator
+                        indicator(belowButton: true)
                     }
                 }
                 // The face is drawn small so it stays in proportion with the cabinet; the
@@ -542,7 +602,10 @@ public struct StarTelevision<Picture: View>: View {
     }
 
     /// The power lamp: lit while the tube is, dark when it is not.
-    private var indicator: some View {
+    ///
+    /// Hung just under the power button, or on its own at the end of the chin when the set has
+    /// no buttons.
+    private func indicator(belowButton: Bool) -> some View {
         Circle()
             .fill(
                 controls.isPictureOn
@@ -555,7 +618,7 @@ public struct StarTelevision<Picture: View>: View {
                     .opacity(controls.isPictureOn ? 0.9 : 0),
                 radius: geometry.controlStrip * 0.06
             )
-            .offset(y: geometry.controlStrip * 0.17)
+            .offset(y: belowButton ? geometry.controlStrip * 0.17 : 0)
             .animation(.easeInOut(duration: 0.25), value: controls.isPictureOn)
     }
 }

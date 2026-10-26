@@ -27,12 +27,24 @@ jobs:
     # GitHub-hosted only, never a self-hosted runner. On a public repository a fork's pull
     # request would otherwise execute arbitrary code on our own machine, which is exactly
     # the trade GitHub warn against — and the runner in question is a Mac on the homelab.
-    runs-on: macos-26
+    #
+    # The `xcode-27` image, because iPhone Duo needs the iOS 27.1 SDK. Built with anything
+    # older, the app is run in a compatibility mode that keeps it out from under the status
+    # bar and camera, and the fold APIs it uses are compiled out (see `FoldPosture.swift`).
+    # CI builds with the same Xcode the release does, so a fold change is compiled here.
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@v4
 
+      # Named by version rather than through the `Xcode.app` alias, so the image moving its
+      # default to a later Xcode cannot change what is built here without a commit saying so.
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
+        run: sudo xcode-select -s /Applications/Xcode_27.1.app
+
+      # Xcode 26 and later ship the Metal compiler separately, and the app targets compile
+      # the CRT shader. Only downloaded when the image does not already carry it.
+      - name: Install the Metal toolchain
+        run: xcrun metal --version >/dev/null 2>&1 || xcodebuild -downloadComponent MetalToolchain
 
       # The whole suite lives in the SwiftPM package, so this needs no Xcode project and no
       # simulator — which also keeps it quick enough to sit on every pull request.
