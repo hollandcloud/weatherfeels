@@ -286,7 +286,8 @@ so a client cannot write outside it.
 
 ## Building
 
-Requires **Xcode 26** or newer, [XcodeGen](https://github.com/yonaskolb/XcodeGen)
+Requires **Xcode 26** or newer — **27.1** or newer for iPhone Duo support, which the release
+and CI builds use (see [iPhone Duo](#iphone-duo)) — [XcodeGen](https://github.com/yonaskolb/XcodeGen)
 (`brew install xcodegen`), and the Metal toolchain, which Xcode 26 no longer bundles:
 
 ```bash
@@ -414,6 +415,46 @@ gives it. So the plist claims all four and `OrientationLock` in
 [`Apps/iOS/WeatherStarApp.swift`](Apps/iOS/WeatherStarApp.swift) returns `.landscape`
 at runtime, which is what actually governs rotation. `PackagingTests` asserts the plist
 side so a future edit cannot quietly reintroduce the rejection.
+
+### iPhone Duo
+
+The foldable gets layouts of its own rather than being treated as a large phone. In points,
+its outer display is 466×678 and its inner one 951×669, with the crease running down the
+middle when the device is held upright.
+
+| Pose | What the app does |
+|---|---|
+| Closed | The outer display behaves like any phone: the set in portrait, the picture in landscape. |
+| Open flat | The inner display is nearly 4:3 already, so the picture fills it. |
+| **Laptop** (part-folded, crease across) | The picture fills the upper half, which is almost exactly 4:3. The lower half lies on the table and becomes the set's **control deck**: a fluorescent readout, a preset button for every display, and the transport. The controls stay on screen there rather than appearing on a tap. |
+| **Book** (part-folded, crease down) | The set stands on the leading page, without buttons on its chin, and the deck is the trailing page. |
+
+The deck's presets are the useful part: everywhere else the rotation can only be stepped one
+display at a time, while on the deck the radar is one press away. A display still loading
+is dimmed and cannot be pressed.
+
+How it is wired, briefly:
+
+- **The fold's reserved region decides the layout, never the hinge angle.** `RootView`
+  reads the `.division` region once and hands it down as a `FoldPosture` value, so the
+  picture and the deck cannot disagree about where the crease is. The angle drives one
+  thing only, a reflection on the laptop pose's glass that slides as the lid is tipped back.
+- **Laid out from the regions, not with `ArrangementView`.** A split arrangement splits
+  whether or not the device is bent, and it only exists from iOS 27.1, so the
+  snapshot tests could not draw it on the Macs they run on.
+- **The 27.1 APIs are compiled behind `canImport(SwiftUI, _version: 8.0.85)`**, the
+  SwiftUI that ships in the iOS 27.1 SDK. A build from Xcode 26 still compiles and treats
+  the Duo as a phone. Swift 6.4 ships with both Xcode 27.0 and 27.1, so a compiler-version
+  check would not tell them apart.
+- **The canvas choice now actually minimises waste.** The wide canvas wins only above an
+  aspect ratio of about 1.54, the point where the two waste the same. It used to be a
+  fixed 1.45, which gave the Duo's outer display and the laptop pose's upper half the wide
+  canvas and drew the forecast a fifth smaller than it needed to be.
+
+`FoldSnapshotTests` renders both folded poses to `/tmp/ws4k-snapshots` at the Duo's own
+sizes, and fails if anything is drawn across the crease. The simulator can bend its hinge,
+but in Xcode 27.1 it cannot be turned on its side from the command line, so the laptop pose
+is checked there rather than on a simulator.
 
 ### Iterating on layout
 
