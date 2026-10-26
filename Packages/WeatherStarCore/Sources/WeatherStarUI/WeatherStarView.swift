@@ -123,16 +123,21 @@ public struct WeatherStarView: View {
     /// A weather bulletin breaking into the rotation, and when it went up.
     private let bulletin: (bulletin: WeatherBulletin, shownAt: Date)?
 
+    /// Whether the Local on the 8s bumper is up.
+    private let showsEightsBumper: Bool
+
     public init(
         isPictureOn: Bool = true,
         showsCabinetControls: Bool = true,
         bulletin: (bulletin: WeatherBulletin, shownAt: Date)? = nil,
+        showsEightsBumper: Bool = false,
         onOpenSettings: @escaping () -> Void = {},
         onPower: @escaping () -> Void = {}
     ) {
         self.isPictureOn = isPictureOn
         self.showsCabinetControls = showsCabinetControls
         self.bulletin = bulletin
+        self.showsEightsBumper = showsEightsBumper
         self.onOpenSettings = onOpenSettings
         self.onPower = onPower
     }
@@ -302,6 +307,9 @@ public struct WeatherStarView: View {
             // Across the whole canvas, as the displays that expand to the wide canvas are: a
             // warning should fill the screen, not sit in its middle.
             BulletinScreen(bulletin: bulletin.bulletin, shownAt: bulletin.shownAt)
+                .environment(\.starContentWidth, metrics.space.width)
+        } else if showsEightsBumper {
+            EightsBumper(place: settings.savedLocation?.name, time: store.clockText())
                 .environment(\.starContentWidth, metrics.space.width)
         } else if let active = engine.activeDisplay {
             activeDisplay(active, metrics: metrics)

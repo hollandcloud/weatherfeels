@@ -57,11 +57,13 @@ public struct RootView: View {
     /// The weather bulletin on screen, and when it went up.
     @State private var bulletin: (bulletin: WeatherBulletin, shownAt: Date)?
     @State private var bulletinDismissal: Task<Void, Never>?
+    /// The Local on the 8s bumper is up, ahead of its segment.
+    @State private var showsEightsBumper = false
     /// Whether the scene is in front, kept as state.
     ///
     /// `scenePhase` is an environment value, and read from a long-running task it is the value
     /// from when the task began — `.inactive`, at launch — however long ago that was. State is
-    /// read live, so the bulletin checks this instead.
+    /// read live, so the bulletin and Local on the 8s check this instead.
     @State private var isSceneActive = false
     @State private var isShowingControls = false
     /// Whether music was playing when the app went to the background, so it can be
@@ -183,6 +185,7 @@ public struct RootView: View {
                 WeatherStarView(
                     isPictureOn: isPictureOn,
                     bulletin: bulletin,
+                    showsEightsBumper: showsEightsBumper,
                     onOpenSettings: { isShowingSettings = true },
                     onPower: togglePower
                 )
@@ -241,6 +244,7 @@ public struct RootView: View {
             if nowBuiltIn { hideControls() }
         }
         .onChange(of: store.pendingBulletins.map(\.id)) { presentBulletinIfNeeded() }
+        .task(id: settings.localOnTheEights) { await runLocalOnTheEights() }
         .animation(.easeInOut(duration: 0.2), value: isShowingControls)
         #if os(tvOS)
         .fullScreenCover(isPresented: $isShowingSettings) { settingsScreen }
@@ -294,6 +298,7 @@ public struct RootView: View {
                 isPictureOn: isPictureOn,
                 showsCabinetControls: false,
                 bulletin: bulletin,
+                showsEightsBumper: showsEightsBumper,
                 onOpenSettings: { isShowingSettings = true },
                 onPower: togglePower
             )
@@ -608,6 +613,44 @@ public struct RootView: View {
         bulletin = nil
         engine.jump(to: .hazards)
         presentBulletinIfNeeded()
+    }
+
+    // MARK: - Local on the 8s
+
+    /// Wait for each minute ending in 8, and cut to the local segment when it comes.
+    ///
+    /// Restarted whenever the setting changes, so turning it off stops it at once.
+    private func runLocalOnTheEights() async {
+        guard settings.localOnTheEights else { return }
+        #if DEBUG
+        // Cue once straight away, for checking the segment without waiting for the clock.
+        if ProcessInfo.processInfo.environment["WS4K_TEST_EIGHTS"] != nil {
+            try? await Task.sleep(for: .seconds(20))
+            await cueLocalOnTheEights()
+        }
+        #endif
+        while !Task.isCancelled {
+            let cue = LocalOnTheEights.nextCue(after: Date())
+            try? await Task.sleep(for: .seconds(max(cue.timeIntervalSinceNow, 1)))
+            guard !Task.isCancelled else { return }
+            await cueLocalOnTheEights()
+        }
+    }
+
+    /// The bumper, then the segment.
+    ///
+    /// Only on a set that is on, in front, and not in the middle of a bulletin: a warning is
+    /// the one thing that outranks the local forecast.
+    private func cueLocalOnTheEights() async {
+        guard isSceneActive, isPictureOn, bulletin == nil, engine.activeDisplay != nil else {
+            return
+        }
+        hideControls()
+        showsEightsBumper = true
+        try? await Task.sleep(for: .seconds(LocalOnTheEights.bumperDuration))
+        showsEightsBumper = false
+        guard !Task.isCancelled, bulletin == nil else { return }
+        engine.playSegment(LocalOnTheEights.segment)
     }
 
     // MARK: - Controls visibility
