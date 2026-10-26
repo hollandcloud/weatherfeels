@@ -180,6 +180,7 @@ public final class AppSettings {
         #else
         burnInProtection = defaults.bool(forKey: Key.burnInProtection, default: false)
         #endif
+        localOnTheEights = defaults.bool(forKey: Key.localOnTheEights, default: false)
         bulletinsEnabled = defaults.bool(forKey: Key.bulletinsEnabled, default: true)
         bulletinTone = defaults.bool(forKey: Key.bulletinTone, default: true)
         shownBulletinIDs = defaults.stringArray(forKey: Key.shownBulletins) ?? []
@@ -240,6 +241,14 @@ public final class AppSettings {
     /// logo and clock. See `BurnInShift`.
     public var burnInProtection: Bool {
         didSet { defaults.set(burnInProtection, forKey: Key.burnInProtection) }
+    }
+
+    // MARK: - Local on the 8s
+
+    /// Whether the rotation cuts to the local segment at every minute ending in 8. Off by
+    /// default: it is a piece of nostalgia, and an interruption, for those who want it.
+    public var localOnTheEights: Bool {
+        didSet { defaults.set(localOnTheEights, forKey: Key.localOnTheEights) }
     }
 
     // MARK: - Weather bulletins
@@ -424,6 +433,7 @@ private enum Key {
     static let remoteMusicURL = prefix + "remoteMusicURL"
     static let uploadPath = prefix + "uploadPath"
     static let uploadToken = prefix + "uploadToken"
+    static let localOnTheEights = prefix + "localOnTheEights"
     static let bulletinsEnabled = prefix + "bulletinsEnabled"
     static let bulletinTone = prefix + "bulletinTone"
     static let shownBulletins = prefix + "shownBulletins"

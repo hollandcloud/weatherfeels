@@ -51,6 +51,13 @@ public final class DisplayEngine {
         }
     }
 
+    /// Whether a fixed segment — Local on the 8s — is playing in place of the rotation.
+    public private(set) var isPlayingSegment = false
+    /// The segment's displays still to come.
+    private var segmentRemaining: [DisplayIdentifier] = []
+    /// Where the rotation was when the segment interrupted it, so it can carry on from there.
+    private var resumeAfterSegment: DisplayIdentifier?
+
     /// Fires when the active display or its screen changes, so views can react.
     public var onScreenChange: (@MainActor (DisplayIdentifier, Int) -> Void)?
 
@@ -111,6 +118,7 @@ public final class DisplayEngine {
         for display in DisplayIdentifier.allCases {
             states[display] = DisplayState()
         }
+        endSegment()
         activeDisplay = nil
         stopLoop()
     }
@@ -139,8 +147,28 @@ public final class DisplayEngine {
         onScreenChange?(display, state.screenIndex)
     }
 
-    /// Move to the next ready display after `display`, wrapping around.
+    /// Move on from `display`: to the segment's next display while one is playing, and
+    /// otherwise to the next ready display in the rotation, wrapping around.
     private func advanceToNextReady(from display: DisplayIdentifier) {
+        if isPlayingSegment {
+            while !segmentRemaining.isEmpty {
+                let next = segmentRemaining.removeFirst()
+                if state(for: next).isReady {
+                    activate(next)
+                    return
+                }
+            }
+            // The segment is over. The rotation picks up after the display it interrupted,
+            // rather than starting again from the top.
+            let resume = resumeAfterSegment ?? display
+            endSegment()
+            advanceRotation(from: resume)
+            return
+        }
+        advanceRotation(from: display)
+    }
+
+    private func advanceRotation(from display: DisplayIdentifier) {
         let ready = readyDisplays
         guard !ready.isEmpty else {
             activeDisplay = nil
@@ -164,7 +192,11 @@ public final class DisplayEngine {
     }
 
     /// Skip to the previous display in the rotation.
+    ///
+    /// Going back abandons a segment: it means "show me what was on before", and what was on
+    /// before the segment is the rotation.
     public func previousDisplay() {
+        endSegment()
         let ready = readyDisplays
         guard !ready.isEmpty else { return }
         guard let active = activeDisplay else { activateFirstReady(); return }
@@ -212,11 +244,39 @@ public final class DisplayEngine {
         restartLoop()
     }
 
-    /// Jump straight to a display, e.g. when a hazard arrives.
+    /// Jump straight to a display, e.g. when a hazard arrives. Abandons any segment.
     public func jump(to display: DisplayIdentifier) {
         guard state(for: display).isReady else { return }
+        endSegment()
         activate(display)
         restartLoop()
+    }
+
+    // MARK: - Segments
+
+    /// Play a fixed run of displays in place of the rotation, then carry on with the rotation
+    /// after the display that was showing.
+    ///
+    /// For Local on the 8s: at each minute ending in 8 the WeatherStar cut to the same few
+    /// displays, whatever the loop had reached. Displays with nothing to show are skipped; if
+    /// none of them have anything, the rotation simply carries on. "Next" steps through the
+    /// segment, as it does through the rotation.
+    public func playSegment(_ displays: [DisplayIdentifier]) {
+        let ready = displays.filter { state(for: $0).isReady }
+        guard let first = ready.first else { return }
+        if !isPlayingSegment {
+            resumeAfterSegment = activeDisplay
+        }
+        isPlayingSegment = true
+        segmentRemaining = Array(ready.dropFirst())
+        activate(first)
+        restartLoop()
+    }
+
+    private func endSegment() {
+        isPlayingSegment = false
+        segmentRemaining = []
+        resumeAfterSegment = nil
     }
 
     // MARK: - Tick loop

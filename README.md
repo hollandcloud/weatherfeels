@@ -77,6 +77,14 @@ asserts a spread of locations land near the middle of their own window — with 
 Maine flagged as a legitimate exception, since the projection only reaches longitude
 −68.68 and the crop has to clamp inside the composite.
 
+### Local on the 8s
+
+The Weather Channel cut away to the local forecast at every minute ending in 8. Turned on in
+Settings (off by default), the rotation does the same: at :08, :18, :28 and so on a bumper
+goes up, then current conditions, the local forecast and the extended forecast play, and the
+rotation picks up after the display it interrupted. A warning outranks it. Debug builds cue it
+twenty seconds after launch with `WS4K_TEST_EIGHTS` set.
+
 ### Weather bulletins
 
 When the National Weather Service issues a *warning* for your location — or anything it

@@ -51,6 +51,7 @@ public struct SettingsView: View {
                 locationSection
                 displaySection
                 rotationSection
+                eightsSection
                 bulletinSection
                 musicSection
                 aboutSection
@@ -274,6 +275,22 @@ public struct SettingsView: View {
             Text("Displays in rotation")
         } footer: {
             Text("Displays with no data for your location are skipped automatically.")
+        }
+    }
+
+    // MARK: - Local on the 8s
+
+    private var eightsSection: some View {
+        Section {
+            Toggle("Local on the 8s", isOn: bind(\.localOnTheEights))
+        } footer: {
+            Text(
+                """
+                At :08, :18, :28 and so on, the rotation cuts to current conditions, the local \
+                forecast and the extended forecast, then carries on where it was — as The \
+                Weather Channel's local forecast did.
+                """
+            )
         }
     }
 
