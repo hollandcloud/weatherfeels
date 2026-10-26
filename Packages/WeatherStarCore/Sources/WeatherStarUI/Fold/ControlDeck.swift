@@ -18,12 +18,28 @@ struct ControlDeckLayout: Equatable {
     let channelsScroll: Bool
     /// Edge of each transport button's square hit area.
     let transportTouch: CGFloat
-    /// One row when the six fit across; otherwise the channel pair and the rest on two.
+    /// One row when they all fit across; otherwise the channel controls on one row and the
+    /// rest on one or two more.
     let transportRows: Int
+    /// How many transport buttons there are: six, or seven with the radar map.
+    let transportButtons: Int
+
+    /// The most buttons on any one transport row.
+    var transportWidestRow: Int {
+        Self.widestRow(buttons: transportButtons, rows: transportRows)
+    }
+
+    static func widestRow(buttons: Int, rows: Int) -> Int {
+        switch rows {
+        case 1: buttons
+        case 2: max(3, buttons - 3)
+        default: max(3, (buttons - 3 + 1) / 2)
+        }
+    }
 
     /// Apple's floor for a touch target, the same one `TelevisionGeometry` holds to.
     static let minimumTouch: CGFloat = 44
-    /// Settings, previous, hold, next, sound, power.
+    /// Settings, previous, hold, next, sound, power — and the radar map where there is one.
     static let transportCount = 6
     /// The narrowest pane that gets four columns of channels rather than two.
     ///
@@ -32,7 +48,9 @@ struct ControlDeckLayout: Equatable {
     /// four columns stays symmetrical in either posture.
     static let fourColumnWidth: CGFloat = 520
 
-    static func resolve(size: CGSize, channelCount: Int) -> ControlDeckLayout {
+    static func resolve(
+        size: CGSize, channelCount: Int, transportButtons: Int = transportCount
+    ) -> ControlDeckLayout {
         let short = min(size.width, size.height)
         let margin = min(max(short * 0.045, 12), 24)
         let spacing = min(max(short * 0.02, 6), 12)
@@ -44,13 +62,13 @@ struct ControlDeckLayout: Equatable {
         let readoutHeight = min(max(inner.height * 0.16, 58), 80)
 
         // As large as a thumb would like, never under the floor. When even the floor will not
-        // fit six across, the row breaks in two rather than shrinking the targets.
-        let gaps = CGFloat(transportCount - 1)
-        let acrossOneRow = (inner.width - spacing * gaps) / CGFloat(transportCount)
-        let transportRows = acrossOneRow >= minimumTouch ? 1 : 2
-        let acrossRow = transportRows == 1
-            ? acrossOneRow
-            : (inner.width - spacing * 2) / 3
+        // fit them all across, the row breaks in two rather than shrinking the targets.
+        func across(_ rows: Int) -> CGFloat {
+            let widest = CGFloat(widestRow(buttons: transportButtons, rows: rows))
+            return (inner.width - spacing * (widest - 1)) / widest
+        }
+        let transportRows = (1...2).first { across($0) >= minimumTouch } ?? 3
+        let acrossRow = across(transportRows)
         let transportTouch = max(minimumTouch, min(inner.height * 0.13, 58, acrossRow))
         let transportHeight = transportTouch * CGFloat(transportRows)
             + spacing * CGFloat(transportRows - 1)
@@ -68,7 +86,8 @@ struct ControlDeckLayout: Equatable {
             channelHeight: min(max(fitted, minimumTouch), 56),
             channelsScroll: fitted < minimumTouch,
             transportTouch: transportTouch,
-            transportRows: transportRows
+            transportRows: transportRows,
+            transportButtons: transportButtons
         )
     }
 }
@@ -110,6 +129,8 @@ struct ControlDeckContent {
     var onToggleSound: () -> Void
     var onSettings: () -> Void
     var onPower: () -> Void
+    /// Opens the zoomable radar map, or `nil` where there is none.
+    var onRadarMap: (() -> Void)? = nil
 }
 
 /// The set's front panel, for a screen folded so that half of it is free to be one.
@@ -141,7 +162,9 @@ struct ControlDeck: View {
     var body: some View {
         GeometryReader { proxy in
             let layout = ControlDeckLayout.resolve(
-                size: proxy.size, channelCount: content.channels.count
+                size: proxy.size,
+                channelCount: content.channels.count,
+                transportButtons: ControlDeckLayout.transportCount + (content.onRadarMap == nil ? 0 : 1)
             )
             VStack(spacing: layout.spacing) {
                 readout(layout)
@@ -331,6 +354,9 @@ struct ControlDeck: View {
             showsLamp: true,
             action: content.onPower
         )
+        let map = content.onRadarMap.map {
+            transportButton("map", label: "Radar map", touch: touch, action: $0)
+        }
 
         if layout.transportRows == 1 {
             // Settings at one end and the set's own switches at the other, with the channel
@@ -342,13 +368,28 @@ struct ControlDeck: View {
                 hold
                 next
                 Spacer(minLength: 0)
+                if let map { map }
                 sound
                 power
+            }
+        } else if layout.transportRows == 2 {
+            VStack(spacing: layout.spacing) {
+                HStack(spacing: layout.spacing) { previous; hold; next }
+                HStack(spacing: layout.spacing) {
+                    settings
+                    if let map { map }
+                    sound
+                    power
+                }
             }
         } else {
             VStack(spacing: layout.spacing) {
                 HStack(spacing: layout.spacing) { previous; hold; next }
-                HStack(spacing: layout.spacing) { settings; sound; power }
+                HStack(spacing: layout.spacing) {
+                    settings
+                    if let map { map }
+                }
+                HStack(spacing: layout.spacing) { sound; power }
             }
         }
     }

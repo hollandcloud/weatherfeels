@@ -49,6 +49,11 @@ public struct RootView: View {
     @State private var hingeAngle: Double?
 
     @State private var isShowingSettings = false
+    /// The zoomable radar map, on the platforms that have one.
+    @State private var isShowingRadarMap = false
+    /// Set by Settings' "Radar map" row, so the map opens once the sheet has finished going
+    /// away rather than trying to present over it.
+    @State private var opensRadarMapAfterSettings = false
     @State private var isShowingControls = false
     /// Whether music was playing when the app went to the background, so it can be
     /// resumed on return.
@@ -186,6 +191,10 @@ public struct RootView: View {
                         isShowingSettings = true
                     },
                     onPower: togglePower,
+                    onRadarMap: radarMapAction {
+                        hideControls()
+                        isShowingRadarMap = true
+                    },
                     onDismiss: hideControls,
                     onInteraction: showControls
                 )
@@ -217,7 +226,19 @@ public struct RootView: View {
         #if os(tvOS)
         .fullScreenCover(isPresented: $isShowingSettings) { settingsScreen }
         #else
-        .sheet(isPresented: $isShowingSettings) { settingsScreen }
+        .sheet(isPresented: $isShowingSettings, onDismiss: {
+            if opensRadarMapAfterSettings {
+                opensRadarMapAfterSettings = false
+                isShowingRadarMap = true
+            }
+        }) { settingsScreen }
+        #endif
+        #if os(iOS)
+        .fullScreenCover(isPresented: $isShowingRadarMap) { radarMapScreen }
+        #elseif os(macOS)
+        .sheet(isPresented: $isShowingRadarMap) {
+            radarMapScreen.frame(minWidth: 820, minHeight: 620)
+        }
         #endif
         #if os(macOS)
         // Keyboard control on the Mac, where there is no remote and tapping is fiddly.
@@ -231,6 +252,8 @@ public struct RootView: View {
                     .keyboardShortcut(.space, modifiers: [])
                 Button("") { isShowingSettings = true }
                     .keyboardShortcut(",", modifiers: .command)
+                Button("") { isShowingRadarMap = true }
+                    .keyboardShortcut("r", modifiers: .command)
             }
             .opacity(0)
         }
@@ -297,9 +320,35 @@ public struct RootView: View {
             onToggleRotation: { engine.isPlaying.toggle() },
             onToggleSound: toggleMusic,
             onSettings: { isShowingSettings = true },
-            onPower: togglePower
+            onPower: togglePower,
+            onRadarMap: radarMapAction { isShowingRadarMap = true }
         )
     }
+
+    /// The radar map's button action, or `nil` where there is no radar map to open.
+    ///
+    /// A function rather than an `#if` at every call site, so the controls that offer the map
+    /// simply leave the button out on Apple TV.
+    private func radarMapAction(_ action: @escaping () -> Void) -> (() -> Void)? {
+        #if os(tvOS)
+        nil
+        #else
+        action
+        #endif
+    }
+
+    #if !os(tvOS)
+    private var radarMapScreen: some View {
+        RadarMapScreen(
+            center: settings.savedLocation,
+            timeZone: store.timeZone,
+            onClose: { isShowingRadarMap = false }
+        )
+        // A presentation starts a fresh environment on some platforms; the crease is the
+        // window's, so the map's controls can stay off it.
+        .environment(\.foldPosture, foldPosture)
+    }
+    #endif
 
     private var settingsScreen: some View {
         ZStack {
@@ -326,9 +375,13 @@ public struct RootView: View {
             // tvOS row is white, and the button's own background is a material, so it
             // sampled that white row and went white too. The result was white "Close" on
             // white, which is unreadable.
-            SettingsView { location in
-                store.load(location: location)
-            }
+            SettingsView(
+                onLocationChange: { location in store.load(location: location) },
+                onOpenRadarMap: radarMapAction {
+                    opensRadarMapAfterSettings = true
+                    isShowingSettings = false
+                }
+            )
             .environment(settings)
             .environment(locationService)
             .environment(musicLibrary)
@@ -359,6 +412,13 @@ public struct RootView: View {
 
         await loadMusic()
         await resolveLocationAndLoad()
+
+        #if !os(tvOS)
+        // For `Tools/shoot.sh` and the like, which need the map on screen and cannot tap.
+        if ProcessInfo.processInfo.environment["WS4K_OPEN_RADAR_MAP"] != nil {
+            isShowingRadarMap = true
+        }
+        #endif
 
         // Reveal the controls once on launch: without this there is no hint that a
         // Settings button exists at all.
@@ -564,6 +624,8 @@ struct ControlsOverlay: View {
     /// already focusable, and the only one the remote can reach — is what makes standby
     /// work on a television at all.
     let onPower: () -> Void
+    /// Opens the zoomable radar map. `nil` on Apple TV, which has none.
+    var onRadarMap: (() -> Void)?
     let onDismiss: () -> Void
     /// Fired on any remote movement, so the host can restart its idle timer.
     var onInteraction: () -> Void = {}
@@ -579,6 +641,10 @@ struct ControlsOverlay: View {
                     .focused($focusedControl, equals: .playPause)
                 button("forward.end.fill", action: onNext)
                     .focused($focusedControl, equals: .next)
+                if let onRadarMap {
+                    button("map", action: onRadarMap)
+                        .accessibilityLabel("Radar map")
+                }
 
                 Divider().frame(height: 28).overlay(.white.opacity(0.4))
 
