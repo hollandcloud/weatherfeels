@@ -99,11 +99,24 @@ extension DesignSpace {
 
             // Clearly taller than square: use the portrait canvas.
             if aspect < 0.85 { return .portrait }
-            // Widescreen and beyond: use the wide canvas.
-            if aspect > 1.45 { return .wide }
+            if aspect > wideCrossover { return .wide }
             return .standard
         }
     }
+
+    /// The aspect ratio above which the wide canvas wastes less of the screen than the
+    /// standard one, about 1.54.
+    ///
+    /// It is where the two waste equally — the standard canvas's bars at the sides against the
+    /// wide canvas's bars above and below — which works out to the geometric mean of their
+    /// aspect ratios.
+    ///
+    /// This used to be a fixed 1.45, which left a band where the canvas that wasted more won.
+    /// Nothing landed in it until iPhone Duo: its outer display in landscape is 1.455, and the
+    /// top half of the inner display stood up like a laptop is about 1.47. Both got the wide
+    /// canvas, with a fifth of the screen in black bars and the forecast drawn a fifth smaller
+    /// than the standard canvas draws it. An iPad mini in landscape (1.52) moves across too.
+    static let wideCrossover = (standard.aspectRatio * wide.aspectRatio).squareRoot()
 }
 
 // MARK: - Environment
