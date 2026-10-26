@@ -1,7 +1,10 @@
-• The television now makes the noise a CRT makes when it is switched on or off.
+• The Local Radar shows the weather where it actually is, over a sharp map with nearby
+  towns and a legend.
 
-• Mute has joined the buttons on the cabinet, and the floating controls stay out of the way
-  while the set is on screen.
+• Weather bulletins break in when a warning is issued for your location.
 
-• The Hourly forecast's columns stay inside the blue panel instead of hanging off either
-  edge.
+• Local on the 8s: the local forecast at every minute ending in 8, if you turn it on.
+
+• Tides for coastal locations.
+
+• Optional local ads of your own, from Settings or a companion server you run.
