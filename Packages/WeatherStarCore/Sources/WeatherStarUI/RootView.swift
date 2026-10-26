@@ -2,6 +2,9 @@ import SwiftUI
 #if canImport(UIKit)
 import UIKit
 #endif
+#if os(iOS) && canImport(WidgetKit)
+import WidgetKit
+#endif
 import WeatherStarKit
 
 /// Top-level view: runs onboarding on first launch, then the display rotation.
@@ -265,6 +268,14 @@ public struct RootView: View {
         .onChange(of: store.pendingBulletins.map(\.id)) { presentBulletinIfNeeded() }
         .task(id: settings.localOnTheEights) { await runLocalOnTheEights() }
         .task(id: AdsRefreshKey(settings: settings)) { await runAdsRefresh() }
+        #if os(iOS) && canImport(WidgetKit)
+        // The widget fetches its own weather; all it needs from the app is where, and in
+        // which units. Shared whenever either changes, and the widget asked to catch up.
+        .onChange(of: WidgetShare(location: settings.savedLocation, units: settings.units), initial: true) { _, share in
+            SharedContainer.publish(location: share.location, units: share.units)
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+        #endif
         .onChange(of: tickerAdLines, initial: true) { _, lines in store.setTickerAds(lines) }
         .onChange(of: engine.activeDisplay) { _, display in
             guard display != nil else { return }
@@ -643,6 +654,12 @@ public struct RootView: View {
         bulletin = nil
         engine.jump(to: .hazards)
         presentBulletinIfNeeded()
+    }
+
+    /// What the widget is told: the place and the units.
+    private struct WidgetShare: Equatable {
+        let location: SavedLocation?
+        let units: UnitSystem
     }
 
     // MARK: - Ads

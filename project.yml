@@ -41,6 +41,11 @@ settings:
   base:
     WS4K_BUNDLE_ID: net.hlnd.weatherstar
     WS4K_TEAM_ID: 2KD5ZL97LH
+    # The App Group the iOS app shares its place with the widget through. Derived from the
+    # bundle identifier, so a fork with its own identifier gets its own group. Automatic
+    # signing should register it on the first signed build; if it does not, see
+    # "Home screen widget" in README.md.
+    WS4K_APP_GROUP: group.$(WS4K_BUNDLE_ID)
     MARKETING_VERSION: "1.2"
     # Date-based — YYYYMMDD.N — and it only ever goes up: App Store Connect rejects any
     # build not strictly higher than the last one it saw. The build reviewed on 20 August
@@ -104,11 +109,39 @@ targets:
     templateAttributes:
       platformDir: iOS
     platform: iOS
+    dependencies:
+      # The home screen and StandBy widget, embedded in the app.
+      - target: WeatherStar-iOS-Widget
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(WS4K_BUNDLE_ID)
         TARGETED_DEVICE_FAMILY: "1,2" # iPhone and iPad
         SUPPORTS_MACCATALYST: NO
+        # The App Group shared with the widget.
+        CODE_SIGN_ENTITLEMENTS: Apps/iOS/WeatherStar.entitlements
+
+  WeatherStar-iOS-Widget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Apps/iOSWidget
+    dependencies:
+      - package: WeatherStarCore
+        product: WeatherStarUI
+      - package: WeatherStarCore
+        product: WeatherStarKit
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(WS4K_BUNDLE_ID).widget
+        PRODUCT_NAME: weatherfeelsWidget
+        INFOPLIST_FILE: Apps/iOSWidget/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Apps/iOSWidget/Widget.entitlements
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SKIP_INSTALL: YES
+        # The widget gallery needs iOS 17's container backgrounds.
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
 
   WeatherStar-tvOS:
     templates: [App]

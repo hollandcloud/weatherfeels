@@ -148,6 +148,31 @@ about 240 requests in a few seconds, and nowCOAST's CloudFront front end answere
 sharing a carrier's address with other users would lose the map that way. The composite
 covers the lower 48 only, and the map says so elsewhere rather than showing clear skies.
 
+### Home screen widget
+
+On iPhone and iPad, a Current Conditions widget in WeatherStar dress: the pixel icon,
+temperature, place and condition in the Star4000 faces on the blue field. It comes in three
+sizes. Small is the one StandBy shows on a charging phone turned on its side. Medium adds
+the observation time. Large adds the rest of the Current Conditions panel: wind, humidity,
+dewpoint, visibility, pressure, and heat index or wind chill when one applies. On the
+smallest phones the large table steps down a size, then drops its last rows, rather than
+run off the bottom.
+
+The widget fetches its own observation every half hour for the place the app is showing, so
+it stays current when the app has not been opened for hours. The app shares only that place
+and the units, through an App Group. Until a place has been chosen, the widget says to open
+the app.
+
+The App Group is `group.` plus your bundle identifier (`WS4K_APP_GROUP` in `project.yml`), so
+a fork with its own identifier gets its own group. The widget extension is a second App ID,
+`<bundle id>.widget`. Automatic signing with `-allowProvisioningUpdates`, as `archive.sh`
+uses, should register both on the first signed build. If an archive fails on the
+`com.apple.security.application-groups` entitlement, register them by hand at
+developer.apple.com → Certificates, Identifiers & Profiles. Create the group under
+Identifiers → App Groups, then enable App Groups on both App IDs and tick that group. If
+the group is missing or the build is not entitled to it, the widget asks for a place rather
+than failing. tvOS has no widgets, and the Mac app does not ship one.
+
 ## Screen care on a television
 
 Two options under **Settings → Display**, both aimed at an Apple TV left running for
@@ -607,6 +632,7 @@ Packages/WeatherStarCore/       Swift package — all logic and UI
   Sources/WeatherStarResources/ fonts, icons, maps, city tables, default music
   Tests/                        100 tests across 16 suites
 Apps/{iOS,tvOS,macOS}/          thin app targets: @main + Info.plist
+Apps/iOSWidget/                 home screen and StandBy widget extension
 Tools/woff2ttf.py               WOFF → TTF converter (no dependencies)
 server/                         companion music server
 project.yml                     XcodeGen spec

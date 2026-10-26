@@ -55,6 +55,8 @@
 		<string>UIInterfaceOrientationPortrait</string>
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 	</array>
+	<key>WS4KAppGroup</key>
+	<string>$(WS4K_APP_GROUP)</string>
 	<key>WS4KLogoLines</key>
 	<string>WEATHER|FEELS</string>
 	<key>WS4KStartupSubtitle</key>

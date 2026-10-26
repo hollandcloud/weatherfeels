@@ -229,16 +229,6 @@ public final class WeatherStore {
         var condition = observation.textDescription ?? ""
         if condition.count > 15 { condition = ConditionText.shorten(condition) }
 
-        // Wind reads "NW 12", or "Calm" when the station reports zero.
-        let speedValue = units.windSpeed.value(observation.windSpeed?.value)
-        let wind: String = if speedValue == 0 {
-            "Calm"
-        } else if let speedValue {
-            "\(Calc.directionToNSEW(observation.windDirection?.value)) \(Int(speedValue))"
-        } else {
-            "-"
-        }
-
         var gust: String?
         if let gustValue = units.windSpeed.value(observation.windGust?.value), gustValue > 0 {
             gust = "Gusts to \(Int(gustValue))"
@@ -261,19 +251,7 @@ public final class WeatherStore {
 
         let temperatureValue = units.temperature.value(observation.temperature?.value)
 
-        // Heat index and wind chill are mutually exclusive; show whichever differs
-        // from the actual temperature.
-        var apparentLabel: String?
-        var apparentValue: String?
-        if let heatIndex = units.temperature.value(observation.heatIndex?.value),
-           heatIndex != temperatureValue {
-            apparentLabel = "Heat Index:"
-            apparentValue = "\(Int(heatIndex))\(degreeSign)"
-        } else if let windChill = units.temperature.value(observation.windChill?.value),
-                  let temperatureValue, windChill < temperatureValue {
-            apparentLabel = "Wind Chill:"
-            apparentValue = "\(Int(windChill))\(degreeSign)"
-        }
+        let apparent = ObservationText.apparent(observation, units: units)
 
         // Observations older than an hourly cycle plus propagation delay are labelled
         // "Recent" rather than "Current".
@@ -289,7 +267,7 @@ public final class WeatherStore {
             temperature: "\(units.temperature(observation.temperature?.value))\(degreeSign)",
             condition: condition,
             icon: IconMapper.largeIcon(for: observation.icon),
-            wind: wind,
+            wind: ObservationText.wind(observation, units: units),
             windGust: gust,
             humidity: "\(units.temperature.value(nil) == nil ? "" : "")\(Int((observation.relativeHumidity?.value ?? 0).rounded()))%",
             dewpoint: "\(units.temperature(observation.dewpoint?.value))\(degreeSign)",
@@ -299,8 +277,8 @@ public final class WeatherStore {
             // trailing space it left behind showed up in the ticker.
             pressure: "\(units.pressure(observation.barometricPressure?.value))\(units.pressure.units) \(trend)"
                 .trimmingCharacters(in: .whitespaces),
-            apparentLabel: apparentLabel,
-            apparentValue: apparentValue,
+            apparentLabel: apparent?.label,
+            apparentValue: apparent?.value,
             observedAt: observation.timestamp,
             isStale: isStale,
             temperatureValue: temperatureValue
