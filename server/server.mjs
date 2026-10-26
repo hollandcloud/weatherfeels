@@ -18,7 +18,7 @@
 //   GET  /ads.json           enabled ads only, manifest schema v1
 //   GET  /ads/images/<file>  ad card images
 //   GET  /ads/clips/<file>   clip reel videos, with range support
-//   GET  /health             { ok, tracks, ticker, cards, clips, musicDir }
+//   GET  /health             { ok, tracks, ticker, cards, clips }
 //
 // Uploads (bearer token when WS4K_TOKEN is set, open otherwise, as before):
 //   POST /upload             multipart/form-data: `file`, optional `path`

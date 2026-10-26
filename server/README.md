@@ -137,7 +137,7 @@ JSON bodies (the ads manifest) are always capped at 1 MB.
 | `GET /ads.json` | The public ads manifest: **enabled items only**, without the `enabled` flag |
 | `GET /ads/images/<file>` | An ad card image: `.png`, `.jpg`/`.jpeg`, `.gif`, `.webp` |
 | `GET /ads/clips/<file>` | A clip: `.mp4`, `.m4v`, `.mov`, with range requests (AVPlayer needs them) |
-| `GET /health` | `{ ok, tracks, ticker, cards, clips, musicDir }`; the ad counts are of enabled items |
+| `GET /health` | `{ ok, tracks, ticker, cards, clips }`; the ad counts are of enabled items |
 
 These send `Access-Control-Allow-Origin: *`, as ws4kp does. Media routes also
 answer `HEAD`.
@@ -325,9 +325,10 @@ The server is designed to be safe to expose, but treat it like any small web app
 - **Mind the original upload routes.** For compatibility, `POST /upload` and
   `PUT /music/…` stay open when no token is set, as they always have. If the server
   is reachable by anyone you do not trust, set a token.
-- **Everything readable is public.** Music, ads, clips and `/health` (which
-  includes the music folder's path) need no token. Do not put anything private in
-  these folders.
+- **Everything readable is public.** Music, ads, clips and `/health` need no token.
+  Do not put anything private in these folders. `/health` used to include the music
+  folder's path on the host; v2 leaves it out, since nothing reads it and it tells a
+  stranger where the files live.
 - **File names are checked, not cleaned up.** Every admin route accepts only a bare
   name of `A–Z a–z 0–9 . _ - space` with the right extension for its folder, and
   refuses `..`, separators, absolute paths and hidden files with a `400`. Paths are

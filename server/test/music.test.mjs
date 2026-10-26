@@ -109,12 +109,12 @@ describe('music endpoints, no token configured', () => {
 		assert.equal(res.status, 201);
 	});
 
-	test('GET /health keeps ok, tracks and musicDir, and adds the ad counts', async () => {
+	test('GET /health keeps ok and tracks, adds the ad counts, and does not reveal the music folder', async () => {
 		const res = await server.request({ path: '/health' });
 		assert.equal(res.status, 200);
 		assert.equal(res.json.ok, true);
 		assert.equal(typeof res.json.tracks, 'number');
-		assert.equal(res.json.musicDir, server.musicDir);
+		assert.equal('musicDir' in res.json, false, 'an unauthenticated route has no use for a path on the host');
 		assert.equal(res.json.ticker, 0);
 		assert.equal(res.json.cards, 0);
 		assert.equal(res.json.clips, 0);

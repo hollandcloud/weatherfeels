@@ -318,7 +318,6 @@ export const createCompanionServer = (config, { logger = console } = {}) => {
 				ticker: ads.ticker.length,
 				cards: ads.cards.length,
 				clips: ads.clips.length,
-				musicDir: config.musicDir,
 			}, OPEN_CORS);
 		}
 
