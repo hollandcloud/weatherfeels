@@ -23,12 +23,15 @@ struct ExtendedForecastDisplay: View {
         static let panelTop: CGFloat = 10
         static let dateY: CGFloat = 8
         static let conditionY: CGFloat = 50
-        static let conditionHeight: CGFloat = 84
         static let iconY: CGFloat = 132
         static let temperatureY: CGFloat = 202
         /// Matches the background artwork's panel, 100..397 in design space.
         static let panelHeight: CGFloat = 297
         static let iconHeight: CGFloat = 75
+        /// Everything above the icon. The box used to be 84pt and so overlapped it by two.
+        static let conditionHeight: CGFloat = iconY - conditionY
+        /// Tried largest first; the first at which the condition fits above the icon wins.
+        static let conditionSizes: [CGFloat] = [32, 28, 24, 20]
     }
 
     private var visibleDays: [ExtendedDay] {
@@ -67,22 +70,12 @@ struct ExtendedForecastDisplay: View {
             .designFrame(width: Layout.panelWidth, alignment: .center)
             .designOffset(y: Layout.dateY)
 
-            // Wrapped by the layout, and allowed to condense a little so a long
-            // forecast like "Showers And Thunderstorms" fits two lines.
-            StarText(
-                day.condition,
-                font: .regular,
-                size: 32,
-                alignment: .center,
-                lineLimit: 3,
-                minimumScaleFactor: 0.55
-            )
             // No x offset. This frame is narrower than the panel and the enclosing ZStack
             // already centres it; adding half the difference as an inset applied the
             // centring twice, pushing the text against the panel's right edge and
             // truncating the last line.
-            .designFrame(width: Layout.textWidth, height: Layout.conditionHeight, alignment: .top)
-            .designOffset(y: Layout.conditionY)
+            Self.condition(day.condition)
+                .designOffset(y: Layout.conditionY)
 
             PixelImage(day.icon, height: Layout.iconHeight)
                 .designFrame(width: Layout.panelWidth, alignment: .center)
@@ -97,6 +90,29 @@ struct ExtendedForecastDisplay: View {
             .designOffset(y: Layout.temperatureY)
         }
         .designFrame(width: Layout.panelWidth, height: Layout.panelHeight, alignment: .top)
+    }
+
+    /// A day's condition, wrapped, at the largest size that fits above the icon.
+    ///
+    /// Each size is still allowed to condense a little, so a long forecast like "Showers
+    /// And Thunderstorms" keeps the full size on two lines. Only text that will not fit even
+    /// then steps down. That has to be chosen here: `StarText` keeps its natural height, so
+    /// its scale factor only ever condensed a line to the width, and a third line of
+    /// "Slight Chance Rain Showers" ran straight down onto the icon.
+    static func condition(_ text: String) -> some View {
+        ViewThatFits(in: .vertical) {
+            ForEach(Layout.conditionSizes, id: \.self) { size in
+                StarText(
+                    text,
+                    font: .regular,
+                    size: size,
+                    alignment: .center,
+                    lineLimit: 3,
+                    minimumScaleFactor: 0.55
+                )
+            }
+        }
+        .designFrame(width: Layout.textWidth, height: Layout.conditionHeight, alignment: .top)
     }
 
     private func temperatureBlock(label: String, value: String, color: Color) -> some View {
