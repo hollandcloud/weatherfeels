@@ -1,0 +1,16 @@
+{
+  "name": "weatherfeels-companion",
+  "version": "2.0.0",
+  "description": "Self-hosted music, ads and clip reel for the weatherfeels WeatherStar app, with a web admin page.",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "main": "server.mjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}
