@@ -478,6 +478,7 @@ extension DisplayIdentifier {
         case .localForecast: "Local"
         case .extendedForecast: "Extended"
         case .almanac: "Almanac"
+        case .tides: "Tides"
         case .spcOutlook: "Outlook"
         case .radar: "Radar"
         }

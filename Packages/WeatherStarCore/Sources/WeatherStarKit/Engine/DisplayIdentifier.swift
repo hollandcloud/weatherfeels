@@ -15,6 +15,8 @@ public enum DisplayIdentifier: String, Codable, Sendable, CaseIterable, Identifi
     case localForecast = "local-forecast"
     case extendedForecast = "extended-forecast"
     case almanac = "almanac"
+    /// Not in upstream: the WeatherStar's coastal tide display, which ws4kp never ported.
+    case tides = "tides"
     case spcOutlook = "spc-outlook"
     case radar = "radar"
 
@@ -35,6 +37,9 @@ public enum DisplayIdentifier: String, Codable, Sendable, CaseIterable, Identifi
         case .almanac: 9
         case .spcOutlook: 10
         case .radar: 11
+        // Not one of upstream's: the first id it does not use, so every upstream display
+        // keeps its own and Tides plays after Radar.
+        case .tides: 12
         }
     }
 
@@ -51,6 +56,7 @@ public enum DisplayIdentifier: String, Codable, Sendable, CaseIterable, Identifi
         case .localForecast: "Local Forecast"
         case .extendedForecast: "Extended Forecast"
         case .almanac: "Almanac"
+        case .tides: "Tides"
         case .spcOutlook: "SPC Outlook"
         case .radar: "Radar"
         }
@@ -69,6 +75,7 @@ public enum DisplayIdentifier: String, Codable, Sendable, CaseIterable, Identifi
         case .localForecast: ("Local", "Forecast")
         case .extendedForecast: ("Extended", "Forecast")
         case .almanac: ("Almanac", nil)
+        case .tides: ("Tides", nil)
         case .spcOutlook: ("SPC Outlook", nil)
         case .radar: ("Local", "Radar")
         }

@@ -49,11 +49,17 @@ which visibly softens on a 4K TV.
 
 ## Displays
 
-All twelve, matching upstream's rotation order and per-display timing:
+Upstream's twelve, in its rotation order and per-display timing, and one more:
 
 Hazards · Current Conditions · Latest Observations · Hourly Forecast ·
 Hourly Graph · Travel Forecast · Regional Observations · Local Forecast ·
-Extended Forecast · Almanac · SPC Outlook · Radar
+Extended Forecast · Almanac · SPC Outlook · Radar · **Tides**
+
+Tides is the one display upstream never had: the WeatherStar ran it in coastal markets. It
+shows today's and tomorrow's highs and lows from the nearest NOAA tide station, from a
+bundled table of 3,502 stations that `Tools/MakeTideStations.py` builds. Only a station within
+30 km counts, so it appears on the coast and simply drops out inland. Predictions are asked
+for in GMT and shown in the forecast location's own time zone.
 
 Plus the startup progress screen and the bottom conditions ticker. Each display
 loads independently and reports its own status, so one unavailable source (a
@@ -628,6 +634,7 @@ control deck, the top of Settings, or ⌘R on the Mac.
 - Radar composites: [Iowa Environmental Mesonet](https://mesonet.agron.iastate.edu/) (public domain).
 - Radar base map: [Natural Earth](https://www.naturalearthdata.com/) (public domain).
 - Convective outlooks: [NOAA Storm Prediction Center](https://www.spc.noaa.gov/).
+- Tide predictions: [NOAA CO-OPS](https://tidesandcurrents.noaa.gov/) (public domain).
 - Sun and moon math ported from [SunCalc](https://github.com/mourner/suncalc) (BSD-2-Clause).
 
 MIT licensed. Not affiliated with, endorsed by, or connected to The Weather
