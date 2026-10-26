@@ -1,0 +1,10 @@
+# The image needs only package.json, server.mjs, lib/ and admin/.
+# Keep your own music and ads, and anything secret, out of the build context.
+music
+ads
+test
+node_modules
+.env
+*.env
+*.log
+.DS_Store

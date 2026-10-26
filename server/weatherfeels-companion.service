@@ -1,0 +1,60 @@
+# systemd unit for the weatherfeels companion server.
+#
+# Install (as root):
+#   cp -r server /opt/weatherfeels-companion
+#   cp /opt/weatherfeels-companion/weatherfeels-companion.service /etc/systemd/system/
+#   install -m 600 /dev/null /etc/weatherfeels-companion.env
+#   echo "WS4K_TOKEN=$(openssl rand -hex 32)" > /etc/weatherfeels-companion.env
+#   systemctl daemon-reload
+#   systemctl enable --now weatherfeels-companion
+#
+# Music and ads live in /var/lib/weatherfeels-companion, which systemd creates and
+# owns for the service's dynamic user. Logs: journalctl -u weatherfeels-companion
+
+[Unit]
+Description=weatherfeels companion server (music, ads and clips for the WeatherStar app)
+Documentation=https://github.com/hollandcloud/weatherfeels/tree/main/server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/env node /opt/weatherfeels-companion/server.mjs
+WorkingDirectory=/opt/weatherfeels-companion
+
+Environment=NODE_ENV=production
+Environment=WS4K_PORT=8080
+Environment=WS4K_MUSIC_DIR=/var/lib/weatherfeels-companion/music
+Environment=WS4K_ADS_DIR=/var/lib/weatherfeels-companion/ads
+Environment=WS4K_MAX_UPLOAD_MB=500
+# WS4K_TOKEN goes here, readable by root only, so it never appears in this file
+# or in `systemctl show`.
+EnvironmentFile=/etc/weatherfeels-companion.env
+
+Restart=on-failure
+RestartSec=5
+
+# Run as a throwaway unprivileged user with a private, persistent state folder.
+DynamicUser=yes
+StateDirectory=weatherfeels-companion
+# To keep music elsewhere (a NAS mount, say), point WS4K_MUSIC_DIR at it and add:
+#   ReadWritePaths=/mnt/music
+# making sure that folder is writable by the service.
+
+# Hardening: the server needs the network and its state folder, nothing else.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target
