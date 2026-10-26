@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synthesise the CRT power on/off sounds.
+"""Synthesise the CRT power on/off sounds, and the weather bulletin chime.
 
     python3 Tools/MakeSounds.py [repo-root]
 
@@ -156,6 +156,36 @@ def power_on() -> list[float]:
     ])
 
 
+def chime(hz: float, start: float, length: float, level: float):
+    """One struck note: a sine with a little of its octave and twelfth, so it rings like a
+    chime rather than beeping like a test tone."""
+    def layer(t: float, phase: float):
+        local = t - start
+        if local < 0 or local > length:
+            return 0.0, phase
+        phase += 2 * math.pi * hz / SAMPLE_RATE
+        tone = math.sin(phase) + 0.25 * math.sin(2 * phase) + 0.08 * math.sin(3 * phase)
+        return tone * level * envelope(local, length, 0.006, length * 0.45), phase
+    return layer
+
+
+def bulletin_tone() -> list[float]:
+    """The weather bulletin's attention chime: a falling two-note "ding-dong", three times.
+
+    What it deliberately is not: the Emergency Alert System's attention signal (853 Hz and
+    960 Hz together), whose use outside a real alert is restricted, or NOAA Weather Radio's
+    1050 Hz warning tone, which can set off a weather radio in the same room. A and E — 880
+    and 659 Hz — are well clear of both, and a chime reads as "look at the screen" rather
+    than as a siren.
+    """
+    layers = []
+    for pair in range(3):
+        base = pair * 0.78
+        layers.append(chime(880.0, base, 0.30, 0.8))
+        layers.append(chime(659.26, base + 0.26, 0.42, 0.8))
+    return render(2.45, layers)
+
+
 def main() -> None:
     random.seed(4000)  # Deterministic: regenerating must not churn the committed files.
     root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent
@@ -163,6 +193,7 @@ def main() -> None:
     print(f"writing to {out}")
     write_wav(out / "crt-power-off.wav", power_off())
     write_wav(out / "crt-power-on.wav", power_on())
+    write_wav(out / "bulletin-tone.wav", bulletin_tone())
 
 
 if __name__ == "__main__":

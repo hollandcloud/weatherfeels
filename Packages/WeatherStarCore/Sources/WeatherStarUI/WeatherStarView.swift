@@ -120,14 +120,19 @@ public struct WeatherStarView: View {
     /// the cabinet was introduced to avoid.
     private let showsCabinetControls: Bool
 
+    /// A weather bulletin breaking into the rotation, and when it went up.
+    private let bulletin: (bulletin: WeatherBulletin, shownAt: Date)?
+
     public init(
         isPictureOn: Bool = true,
         showsCabinetControls: Bool = true,
+        bulletin: (bulletin: WeatherBulletin, shownAt: Date)? = nil,
         onOpenSettings: @escaping () -> Void = {},
         onPower: @escaping () -> Void = {}
     ) {
         self.isPictureOn = isPictureOn
         self.showsCabinetControls = showsCabinetControls
+        self.bulletin = bulletin
         self.onOpenSettings = onOpenSettings
         self.onPower = onPower
     }
@@ -293,7 +298,12 @@ public struct WeatherStarView: View {
     /// tick repaints two labels rather than rebuilding every display each second.
     @ViewBuilder
     private func canvas(metrics: StarMetrics) -> some View {
-        if let active = engine.activeDisplay {
+        if let bulletin {
+            // Across the whole canvas, as the displays that expand to the wide canvas are: a
+            // warning should fill the screen, not sit in its middle.
+            BulletinScreen(bulletin: bulletin.bulletin, shownAt: bulletin.shownAt)
+                .environment(\.starContentWidth, metrics.space.width)
+        } else if let active = engine.activeDisplay {
             activeDisplay(active, metrics: metrics)
         } else {
             startupScreen

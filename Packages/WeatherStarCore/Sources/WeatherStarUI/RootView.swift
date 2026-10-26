@@ -54,6 +54,9 @@ public struct RootView: View {
     /// Set by Settings' "Radar map" row, so the map opens once the sheet has finished going
     /// away rather than trying to present over it.
     @State private var opensRadarMapAfterSettings = false
+    /// The weather bulletin on screen, and when it went up.
+    @State private var bulletin: (bulletin: WeatherBulletin, shownAt: Date)?
+    @State private var bulletinDismissal: Task<Void, Never>?
     @State private var isShowingControls = false
     /// Whether music was playing when the app went to the background, so it can be
     /// resumed on return.
@@ -149,7 +152,7 @@ public struct RootView: View {
             // the d-pad, and while the controls are up the focus engine needs the d-pad
             // to move between them, so the handlers must disappear along with the button.
             if !isShowingControls {
-                Button { showControls() } label: {
+                Button { bulletin != nil ? dismissBulletin() : showControls() } label: {
                     Color.clear.frame(width: 1, height: 1)
                 }
                 .buttonStyle(.plain)
@@ -171,6 +174,7 @@ public struct RootView: View {
             } else {
                 WeatherStarView(
                     isPictureOn: isPictureOn,
+                    bulletin: bulletin,
                     onOpenSettings: { isShowingSettings = true },
                     onPower: togglePower
                 )
@@ -207,7 +211,13 @@ public struct RootView: View {
         // working while the controls are on screen.
         .onPlayPauseCommand { engine.isPlaying.toggle() }
         #else
-        .onTapGesture { isShowingControls ? hideControls() : showControls() }
+        .onTapGesture {
+            if bulletin != nil {
+                dismissBulletin()
+            } else {
+                isShowingControls ? hideControls() : showControls()
+            }
+        }
         #endif
         .background {
             GeometryReader { proxy in
@@ -222,6 +232,7 @@ public struct RootView: View {
         .onChange(of: screenLayout.hasBuiltInControls) { _, nowBuiltIn in
             if nowBuiltIn { hideControls() }
         }
+        .onChange(of: store.pendingBulletins.map(\.id)) { presentBulletinIfNeeded() }
         .animation(.easeInOut(duration: 0.2), value: isShowingControls)
         #if os(tvOS)
         .fullScreenCover(isPresented: $isShowingSettings) { settingsScreen }
@@ -274,6 +285,7 @@ public struct RootView: View {
             WeatherStarView(
                 isPictureOn: isPictureOn,
                 showsCabinetControls: false,
+                bulletin: bulletin,
                 onOpenSettings: { isShowingSettings = true },
                 onPower: togglePower
             )
@@ -413,6 +425,12 @@ public struct RootView: View {
         await loadMusic()
         await resolveLocationAndLoad()
 
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["WS4K_TEST_BULLETIN"] != nil {
+            store.queueSampleBulletin()
+        }
+        #endif
+
         #if !os(tvOS)
         // For `Tools/shoot.sh` and the like, which need the map on screen and cannot tap.
         if ProcessInfo.processInfo.environment["WS4K_OPEN_RADAR_MAP"] != nil {
@@ -516,6 +534,8 @@ public struct RootView: View {
         case .active:
             engine.isPlaying = true
             setIdleTimerDisabled(true)
+            // A warning that arrived in the background is shown on return.
+            presentBulletinIfNeeded()
             // Through `applyMusicState` rather than `play()` directly, so returning to a
             // set that was switched off does not start the music up again.
             if wasPlayingBeforeBackground {
@@ -546,6 +566,39 @@ public struct RootView: View {
         #if canImport(UIKit) && !os(watchOS)
         UIApplication.shared.isIdleTimerDisabled = disabled
         #endif
+    }
+
+    // MARK: - Weather bulletins
+
+    /// Put the next waiting warning on screen, if nothing is already showing one.
+    ///
+    /// A warning wakes a set left in standby. Standby is the user choosing not to watch the
+    /// rotation; it is not a choice to miss a tornado warning, and an app left running on a
+    /// desk or a television is exactly the one that should say so.
+    private func presentBulletinIfNeeded() {
+        guard bulletin == nil, scenePhase == .active, let next = store.takeBulletin() else { return }
+        if !isPictureOn { togglePower() }
+        hideControls()
+        bulletin = (next, Date())
+        if settings.bulletinTone { soundEffects.play(.bulletin) }
+
+        bulletinDismissal?.cancel()
+        bulletinDismissal = Task {
+            try? await Task.sleep(for: .seconds(BulletinScreen.duration(for: next)))
+            guard !Task.isCancelled else { return }
+            dismissBulletin()
+        }
+    }
+
+    /// Take the bulletin down and go to Hazards, where the warning stays listed; then show the
+    /// next one waiting, if there is one.
+    private func dismissBulletin() {
+        bulletinDismissal?.cancel()
+        bulletinDismissal = nil
+        guard bulletin != nil else { return }
+        bulletin = nil
+        engine.jump(to: .hazards)
+        presentBulletinIfNeeded()
     }
 
     // MARK: - Controls visibility

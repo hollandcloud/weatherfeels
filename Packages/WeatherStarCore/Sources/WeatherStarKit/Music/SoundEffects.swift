@@ -18,6 +18,9 @@ public final class SoundEffects {
     public enum Effect: String, CaseIterable, Sendable {
         case powerOn = "crt-power-on"
         case powerOff = "crt-power-off"
+        /// The weather bulletin's attention chime. See `Tools/MakeSounds.py` for why it is a
+        /// chime and not one of the broadcast alert tones.
+        case bulletin = "bulletin-tone"
     }
 
     private static let logger = Logger(
