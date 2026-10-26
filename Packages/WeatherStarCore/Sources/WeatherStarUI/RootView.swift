@@ -57,6 +57,12 @@ public struct RootView: View {
     /// The weather bulletin on screen, and when it went up.
     @State private var bulletin: (bulletin: WeatherBulletin, shownAt: Date)?
     @State private var bulletinDismissal: Task<Void, Never>?
+    /// Whether the scene is in front, kept as state.
+    ///
+    /// `scenePhase` is an environment value, and read from a long-running task it is the value
+    /// from when the task began — `.inactive`, at launch — however long ago that was. State is
+    /// read live, so the bulletin checks this instead.
+    @State private var isSceneActive = false
     @State private var isShowingControls = false
     /// Whether music was playing when the app went to the background, so it can be
     /// resumed on return.
@@ -114,7 +120,9 @@ public struct RootView: View {
             .onChange(of: settings.musicSource) { Task { await loadMusic() } }
             .onChange(of: settings.appleMusicPlaylistID) { Task { await loadMusic() } }
             .onChange(of: settings.musicVolume) { musicPlayer.volume = settings.musicVolume }
-            .onChange(of: scenePhase) { _, phase in handleScenePhase(phase) }
+            // Initially as well as on change: a Mac window can start active and never change,
+            // which would leave `isSceneActive` false and the bulletin never shown.
+            .onChange(of: scenePhase, initial: true) { _, phase in handleScenePhase(phase) }
     }
 
     @ViewBuilder
@@ -530,6 +538,7 @@ public struct RootView: View {
     /// mid-transition, but ambient weather music has no business continuing after the
     /// user leaves — so it is paused explicitly here and resumed on return.
     private func handleScenePhase(_ phase: ScenePhase) {
+        isSceneActive = phase == .active
         switch phase {
         case .active:
             engine.isPlaying = true
@@ -576,7 +585,7 @@ public struct RootView: View {
     /// rotation; it is not a choice to miss a tornado warning, and an app left running on a
     /// desk or a television is exactly the one that should say so.
     private func presentBulletinIfNeeded() {
-        guard bulletin == nil, scenePhase == .active, let next = store.takeBulletin() else { return }
+        guard bulletin == nil, isSceneActive, let next = store.takeBulletin() else { return }
         if !isPictureOn { togglePower() }
         hideControls()
         bulletin = (next, Date())
