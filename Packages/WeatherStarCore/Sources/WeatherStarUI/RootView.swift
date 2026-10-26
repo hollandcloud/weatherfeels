@@ -16,6 +16,7 @@ public struct RootView: View {
     @State private var musicLibrary: MusicLibrary
     @State private var musicPlayer: MusicPlayer
     @State private var soundEffects = SoundEffects()
+    @State private var ads = AdsLibrary()
     @State private var transfer: MusicTransfer
 
     @Environment(\.scenePhase) private var scenePhase
@@ -59,6 +60,13 @@ public struct RootView: View {
     @State private var bulletinDismissal: Task<Void, Never>?
     /// The Local on the 8s bumper is up, ahead of its segment.
     @State private var showsEightsBumper = false
+    /// The ad card on screen in an ad break, with its image.
+    @State private var adCard: (card: AdCard, image: CGImage?)?
+    @State private var adBreakEnd: Task<Void, Never>?
+    /// Displays shown since the last ad break.
+    @State private var displaysSinceBreak = 0
+    /// Which card the next break shows; the cards take turns.
+    @State private var nextCardIndex = 0
     /// Whether the scene is in front, kept as state.
     ///
     /// `scenePhase` is an environment value, and read from a long-running task it is the value
@@ -112,6 +120,7 @@ public struct RootView: View {
             .environment(musicLibrary)
             .environment(musicPlayer)
             .environment(transfer)
+            .environment(ads)
             .task { await start() }
             // Keep the engine's copy of the user's preferences current.
             .onChange(of: settings.speed) { engine.speedMultiplier = settings.speed.multiplier }
@@ -186,6 +195,7 @@ public struct RootView: View {
                     isPictureOn: isPictureOn,
                     bulletin: bulletin,
                     showsEightsBumper: showsEightsBumper,
+                    adCard: adCard,
                     onOpenSettings: { isShowingSettings = true },
                     onPower: togglePower
                 )
@@ -225,6 +235,8 @@ public struct RootView: View {
         .onTapGesture {
             if bulletin != nil {
                 dismissBulletin()
+            } else if adCard != nil {
+                endAdBreak()
             } else {
                 isShowingControls ? hideControls() : showControls()
             }
@@ -245,6 +257,13 @@ public struct RootView: View {
         }
         .onChange(of: store.pendingBulletins.map(\.id)) { presentBulletinIfNeeded() }
         .task(id: settings.localOnTheEights) { await runLocalOnTheEights() }
+        .task(id: AdsRefreshKey(settings: settings)) { await runAdsRefresh() }
+        .onChange(of: tickerAdLines, initial: true) { _, lines in store.setTickerAds(lines) }
+        .onChange(of: engine.activeDisplay) { _, display in
+            guard display != nil else { return }
+            displaysSinceBreak += 1
+            considerAdBreak()
+        }
         .animation(.easeInOut(duration: 0.2), value: isShowingControls)
         #if os(tvOS)
         .fullScreenCover(isPresented: $isShowingSettings) { settingsScreen }
@@ -299,6 +318,7 @@ public struct RootView: View {
                 showsCabinetControls: false,
                 bulletin: bulletin,
                 showsEightsBumper: showsEightsBumper,
+                adCard: adCard,
                 onOpenSettings: { isShowingSettings = true },
                 onPower: togglePower
             )
@@ -412,6 +432,7 @@ public struct RootView: View {
             .environment(musicLibrary)
             .environment(transfer)
             .environment(musicPlayer)
+            .environment(ads)
         }
         // Pinned dark at the *presentation* level rather than by overriding
         // `EnvironmentValues.colorScheme`.
@@ -593,6 +614,7 @@ public struct RootView: View {
         guard bulletin == nil, isSceneActive, let next = store.takeBulletin() else { return }
         if !isPictureOn { togglePower() }
         hideControls()
+        if adCard != nil { endAdBreak() }
         bulletin = (next, Date())
         if settings.bulletinTone { soundEffects.play(.bulletin) }
 
@@ -613,6 +635,75 @@ public struct RootView: View {
         bulletin = nil
         engine.jump(to: .hazards)
         presentBulletinIfNeeded()
+    }
+
+    // MARK: - Ads
+
+    /// What the ads fetch depends on; a change to any of it fetches again.
+    private struct AdsRefreshKey: Equatable {
+        let needsServer: Bool
+        let server: String
+        let cards: Bool
+
+        @MainActor
+        init(settings: AppSettings) {
+            needsServer = AdsLibrary.needsServer(settings)
+            server = settings.remoteMusicURLString
+            cards = settings.adCardsEnabled
+        }
+    }
+
+    /// Fetch the ads now, and again at the weather's refresh interval while any are on.
+    private func runAdsRefresh() async {
+        await ads.refresh(settings: settings)
+        while AdsLibrary.needsServer(settings), !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(settings.refreshInterval))
+            guard !Task.isCancelled else { return }
+            await ads.refresh(settings: settings)
+        }
+    }
+
+    /// The ticker's ad lines: the user's own, then the server's. None unless switched on.
+    private var tickerAdLines: [String] {
+        guard settings.tickerAdsEnabled else { return [] }
+        return settings.tickerAdLines + ads.manifest.ticker.map(\.text)
+    }
+
+    /// Take an ad break if one is due, there is something to show, and nothing outranks it.
+    private func considerAdBreak() {
+        let cards = settings.adCardsEnabled ? ads.manifest.cards : []
+        guard !cards.isEmpty, adCard == nil else { return }
+        let conditions = AdBreaks.Conditions(
+            sceneIsActive: isSceneActive,
+            pictureIsOn: isPictureOn,
+            rotationHeld: !engine.isPlaying,
+            bulletinShowing: bulletin != nil,
+            localSegmentPlaying: showsEightsBumper || engine.isPlayingSegment
+        )
+        guard AdBreaks.isDue(
+            displaysSinceBreak: displaysSinceBreak, every: settings.adBreakEvery, conditions: conditions
+        ) else { return }
+
+        let card = cards[nextCardIndex % cards.count]
+        nextCardIndex += 1
+        hideControls()
+        engine.isSuspended = true
+        adCard = (card, ads.cardImages[card.id])
+        adBreakEnd?.cancel()
+        adBreakEnd = Task {
+            try? await Task.sleep(for: .seconds(card.seconds))
+            guard !Task.isCancelled else { return }
+            endAdBreak()
+        }
+    }
+
+    /// Back to the rotation, where it was.
+    private func endAdBreak() {
+        adBreakEnd?.cancel()
+        adBreakEnd = nil
+        adCard = nil
+        displaysSinceBreak = 0
+        engine.isSuspended = false
     }
 
     // MARK: - Local on the 8s

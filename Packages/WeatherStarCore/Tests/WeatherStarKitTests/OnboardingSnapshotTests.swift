@@ -91,6 +91,7 @@ struct OnboardingSnapshotTests {
             .environment(store)
             .environment(LocationService.shared)
             .environment(library)
+            .environment(AdsLibrary(fetch: { _ in Data() }))
 
         #expect(render(view, named: "settings-tv", size: Self.tvSize) != nil)
         #expect(render(view, named: "settings-phone", size: Self.phoneSize) != nil)
@@ -154,6 +155,7 @@ struct OnboardingSnapshotTests {
                     .environment(store)
                     .environment(LocationService.shared)
                     .environment(MusicLibrary(settings: store))
+                    .environment(AdsLibrary(fetch: { _ in Data() }))
             }
             .environment(\.colorScheme, .dark)
         }

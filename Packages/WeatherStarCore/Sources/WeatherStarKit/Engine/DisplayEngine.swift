@@ -38,6 +38,18 @@ public final class DisplayEngine {
         }
     }
 
+    /// Whether the rotation is paused for something else on screen — an ad break.
+    ///
+    /// Separate from `isPlaying`, which is the user's own choice: the hold button shows it,
+    /// and an ad break flipping it would show the wrong state and fight anyone who pressed
+    /// hold during the break. The loop runs only while playing and not suspended.
+    public var isSuspended = false {
+        didSet {
+            guard isSuspended != oldValue else { return }
+            if isSuspended { stopLoop() } else { startLoop() }
+        }
+    }
+
     /// Multiplier applied to every dwell time.
     public var speedMultiplier: Double = 1.0
 
@@ -282,7 +294,7 @@ public final class DisplayEngine {
     // MARK: - Tick loop
 
     private func startLoop() {
-        guard loopTask == nil, isPlaying, activeDisplay != nil else { return }
+        guard loopTask == nil, isPlaying, !isSuspended, activeDisplay != nil else { return }
         // `self` is only strongified for the duration of each iteration, so the
         // engine can still be deallocated while the loop is sleeping.
         loopTask = Task { [weak self] in
@@ -301,7 +313,7 @@ public final class DisplayEngine {
 
     /// Milliseconds until the next tick, or nil when the loop should stop.
     private func currentTickInterval() -> Double? {
-        guard isPlaying, let active = activeDisplay else { return nil }
+        guard isPlaying, !isSuspended, let active = activeDisplay else { return nil }
         return state(for: active).timing.baseDelay * max(speedMultiplier, 0.1)
     }
 

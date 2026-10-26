@@ -11,6 +11,7 @@ public struct SettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(LocationService.self) private var locationService
     @Environment(MusicLibrary.self) private var musicLibrary
+    @Environment(AdsLibrary.self) private var ads
     @Environment(\.dismiss) private var dismiss
 
     /// Called when a change requires reloading weather data.
@@ -53,6 +54,8 @@ public struct SettingsView: View {
                 rotationSection
                 eightsSection
                 bulletinSection
+                companionSection
+                adsSection
                 musicSection
                 aboutSection
             }
@@ -275,6 +278,89 @@ public struct SettingsView: View {
             Text("Displays in rotation")
         } footer: {
             Text("Displays with no data for your location are skipped automatically.")
+        }
+    }
+
+    // MARK: - Companion server
+
+    private var companionSection: some View {
+        Section {
+            TextField("http://nas.local:8080", text: bind(\.remoteMusicURLString))
+                #if os(iOS)
+                .textInputAutocapitalization(.never)
+                .keyboardType(.URL)
+                #endif
+                .autocorrectionDisabled()
+            if let admin = settings.companionServerURL.flatMap({ URL(string: "admin", relativeTo: AdsManifest.root(of: $0)) }) {
+                #if os(tvOS)
+                // No browser on Apple TV: say where to go instead.
+                Text("Manage it from a phone or computer at \(admin.absoluteString)")
+                    .font(.footnote)
+                #else
+                Link(destination: admin.absoluteURL) {
+                    Label("Open the admin page", systemImage: "safari")
+                }
+                #endif
+            }
+        } header: {
+            Text("Companion server")
+        } footer: {
+            Text(
+                """
+                Your own server, from server/ in the repository. It can hold music, ticker \
+                messages, local ad cards and a clip reel, managed from its admin page. The same \
+                address is used by the Music server source.
+                """
+            )
+        }
+    }
+
+    // MARK: - Ads
+
+    private var adsSection: some View {
+        let hasServer = settings.companionServerURL != nil
+        return Section {
+            Toggle("Ticker messages", isOn: bind(\.tickerAdsEnabled))
+            NavigationLink {
+                TickerLinesEditor()
+            } label: {
+                LabeledContent("Messages typed here", value: "\(settings.tickerAdLines.count)")
+            }
+            .disabled(!settings.tickerAdsEnabled)
+
+            Toggle("Local ad cards", isOn: bind(\.adCardsEnabled))
+                .disabled(!hasServer)
+            Picker("Ad break every", selection: bind(\.adBreakEvery)) {
+                ForEach(AdBreaks.intervals, id: \.self) { count in
+                    Text("\(count) displays").tag(count)
+                }
+            }
+            .disabled(!settings.adCardsEnabled)
+
+            if AdsLibrary.needsServer(settings), hasServer {
+                if let error = ads.lastError {
+                    Label("Server: \(error)", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .font(.footnote)
+                } else {
+                    Text(
+                        "From the server: \(ads.manifest.ticker.count) ticker lines, "
+                            + "\(ads.manifest.cards.count) cards, \(ads.manifest.clips.count) clips"
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Ads")
+        } footer: {
+            Text(
+                """
+                Off unless you turn them on. Ticker messages can be typed here; cards come from \
+                your companion server. Nothing is fetched from the server for ads until one of \
+                these is on.
+                """
+            )
         }
     }
 
