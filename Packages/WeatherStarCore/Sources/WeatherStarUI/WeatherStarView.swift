@@ -463,6 +463,11 @@ public struct WeatherStarView: View {
                 AlmanacDisplay(data: data)
             }
 
+        case .tides:
+            if let data = store.tides {
+                TidesDisplay(data: data, timeZone: store.timeZone)
+            }
+
         case .hazards:
             HazardsDisplay(hazards: store.hazards)
 

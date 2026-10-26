@@ -32,6 +32,7 @@ public final class WeatherStore {
     public private(set) var extendedDays: [ExtendedDay] = []
     public private(set) var almanac: AlmanacData?
     public private(set) var hazards: [HazardItem] = []
+    public private(set) var tides: TidesData?
     /// Warnings waiting to be shown as a bulletin, most severe first.
     public private(set) var pendingBulletins: [WeatherBulletin] = []
     public private(set) var scroll: ScrollContent?
@@ -136,6 +137,7 @@ public final class WeatherStore {
             (.hazards, { await self.loadHazards(parameters) }),
             (.spcOutlook, { await self.loadSPCOutlook(parameters) }),
             (.radar, { await self.loadRadar(parameters) }),
+            (.tides, { await self.loadTides(parameters) }),
         ]
 
         var completed = 0.0
@@ -853,6 +855,27 @@ public final class WeatherStore {
             for: .radar
         )
         engine.setStatus(.loaded, for: .radar)
+    }
+
+    // MARK: - Tides
+
+    private func loadTides(_ parameters: WeatherParameters) async {
+        engine.setStatus(.loading, for: .tides)
+        // Inland is the usual case, not a failure: no station near enough, no display.
+        guard let data = try? await TideService.shared.tides(
+            latitude: parameters.latitude,
+            longitude: parameters.longitude,
+            timeZone: parameters.timeZone,
+            metric: settings.units == .si
+        ), data.days.contains(where: { !$0.events.isEmpty }) else {
+            tides = nil
+            engine.setTiming(.empty, for: .tides)
+            engine.setStatus(.noData, for: .tides)
+            return
+        }
+        tides = data
+        engine.setTiming(.standard, for: .tides)
+        engine.setStatus(.loaded, for: .tides)
     }
 
     // MARK: - Almanac

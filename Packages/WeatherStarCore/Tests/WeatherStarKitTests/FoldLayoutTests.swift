@@ -255,7 +255,7 @@ struct ControlDeckLayoutTests {
 
     /// On the Duo itself nothing should have to scroll: every display the app has is one
     /// press away in either posture.
-    @Test("All twelve displays fit on the Duo without scrolling")
+    @Test("Every display fits on the Duo without scrolling")
     func everyDisplayFitsOnTheDuo() {
         for (name, size) in Self.duoPanes {
             let layout = ControlDeckLayout.resolve(size: size, channelCount: Self.allChannels)
