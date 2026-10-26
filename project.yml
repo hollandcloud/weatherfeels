@@ -46,7 +46,7 @@ settings:
     # signing should register it on the first signed build; if it does not, see
     # "Home screen widget" in README.md.
     WS4K_APP_GROUP: group.$(WS4K_BUNDLE_ID)
-    MARKETING_VERSION: "1.2"
+    MARKETING_VERSION: "1.3"
     # Date-based — YYYYMMDD.N — and it only ever goes up: App Store Connect rejects any
     # build not strictly higher than the last one it saw. The build reviewed on 20 August
     # was 20260817.1; 20260826.1 followed it. Bump the N suffix for a second build on the
