@@ -39,6 +39,15 @@ public struct RootView: View {
     /// anchors top-leading, which would move the picture.
     @State private var containerSize: CGSize = .zero
 
+    /// How the screen is folded, read once here for the whole window.
+    ///
+    /// The single reading of the fold: the picture, the control deck and onboarding all take
+    /// it from here rather than asking the system themselves, so none of them can place the
+    /// crease somewhere the others do not.
+    @State private var foldPosture: FoldPosture = .flat
+    /// The hinge's angle in degrees while it is partly open, for the glass's reflection.
+    @State private var hingeAngle: Double?
+
     @State private var isShowingSettings = false
     @State private var isShowingControls = false
     /// Whether music was playing when the app went to the background, so it can be
@@ -62,6 +71,24 @@ public struct RootView: View {
 
     public var body: some View {
         content
+            .environment(\.foldPosture, foldPosture)
+            // Read over the whole window, safe area included, so the crease's frame is in the
+            // same coordinates as `FoldSplit`, which lays things out around it.
+            //
+            // Inside a `GeometryReader` that ignores the safe area, not on a background view
+            // that does: on the Duo the plain view stayed 34pt short of the bottom edge, and a
+            // crease measured against a different box from the one it is drawn in lands in the
+            // wrong place as soon as an inset falls on a leading edge.
+            .background {
+                GeometryReader { _ in
+                    Color.clear
+                        .onFoldChange(
+                            posture: { foldPosture = $0 },
+                            hingeAngle: { hingeAngle = $0 }
+                        )
+                }
+                .ignoresSafeArea()
+            }
             .environment(settings)
             .environment(engine)
             .environment(store)
@@ -134,11 +161,15 @@ public struct RootView: View {
             }
             #endif
 
-            WeatherStarView(
-                isPictureOn: isPictureOn,
-                onOpenSettings: { isShowingSettings = true },
-                onPower: togglePower
-            )
+            if case .folded(let posture) = screenLayout {
+                foldedScreen(posture)
+            } else {
+                WeatherStarView(
+                    isPictureOn: isPictureOn,
+                    onOpenSettings: { isShowingSettings = true },
+                    onPower: togglePower
+                )
+            }
 
             if isShowingControls {
                 ControlsOverlay(
@@ -178,8 +209,9 @@ public struct RootView: View {
         }
         // Rotating a phone into portrait brings the set up under an overlay that is already
         // showing; two sets of controls at once is exactly what this change exists to stop.
-        .onChange(of: showsCabinet) { _, nowShowing in
-            if nowShowing { hideControls() }
+        // Bending a Duo's screen brings the control deck up under it in the same way.
+        .onChange(of: screenLayout.hasBuiltInControls) { _, nowBuiltIn in
+            if nowBuiltIn { hideControls() }
         }
         .animation(.easeInOut(duration: 0.2), value: isShowingControls)
         #if os(tvOS)
@@ -203,6 +235,70 @@ public struct RootView: View {
             .opacity(0)
         }
         #endif
+    }
+
+    // MARK: - Folded screen
+
+    /// The picture on one side of the crease and the set's control deck on the other.
+    ///
+    /// The picture takes the first pane — the upper half of a tabletop, which is the half
+    /// stood up to be looked at, or the leading page of a book — and the deck the second.
+    /// Inside its pane the picture keeps every rule it has elsewhere, the canvas choice, the
+    /// cabinet on a tall page and the screen effects included. Only the cabinet's buttons are
+    /// left off, since the deck has them.
+    private func foldedScreen(_ posture: FoldPosture) -> some View {
+        FoldSplit(posture: posture) {
+            WeatherStarView(
+                isPictureOn: isPictureOn,
+                showsCabinetControls: false,
+                onOpenSettings: { isShowingSettings = true },
+                onPower: togglePower
+            )
+            .overlay {
+                // Only on a tabletop, where the picture's half is the one that tilts towards
+                // and away from the viewer. Held like a book, both pages turn about an axis
+                // the viewer is looking along, and a reflection sliding sideways reads as a
+                // smear rather than as light.
+                if case .tabletop = posture {
+                    GlassGlare(hingeAngle: hingeAngle)
+                }
+            }
+        } second: { insets in
+            ControlDeck(content: deckContent, finish: settings.televisionFinish, insets: insets)
+        }
+        // The band along the crease: black, like the room the cabinet stands in.
+        .background(Color.black)
+    }
+
+    private var deckContent: ControlDeckContent {
+        let conditions = store.currentConditions
+        return ControlDeckContent(
+            channels: DisplayIdentifier.rotationOrder
+                .filter { settings.isEnabled($0) }
+                .map { .init(display: $0, isReady: engine.state(for: $0).isReady) },
+            activeDisplay: engine.activeDisplay,
+            conditions: [
+                settings.savedLocation?.name,
+                conditions?.temperature,
+                conditions?.condition,
+            ]
+            .compactMap { $0 }
+            .joined(separator: "  ")
+            .uppercased(),
+            nowPlaying: musicPlayer.isPlaying ? musicPlayer.currentTrackTitle : nil,
+            isRotating: engine.isPlaying,
+            isSoundOn: settings.musicEnabled,
+            isPictureOn: isPictureOn,
+            clock: { store.clockText($0) },
+            clockInterval: settings.clockSeconds ? 1 : 15,
+            onSelect: { engine.jump(to: $0) },
+            onPrevious: { engine.previousDisplay() },
+            onNext: { engine.nextDisplay() },
+            onToggleRotation: { engine.isPlaying.toggle() },
+            onToggleSound: toggleMusic,
+            onSettings: { isShowingSettings = true },
+            onPower: togglePower
+        )
     }
 
     private var settingsScreen: some View {
@@ -394,28 +490,29 @@ public struct RootView: View {
 
     // MARK: - Controls visibility
 
-    /// Whether the cabinet is on screen, and therefore *is* the control surface.
+    /// What the weather screen is made of, and so what carries the controls.
     ///
     /// The same rule `WeatherStarView` draws by, so the two cannot disagree about whether
     /// there are buttons on screen — a disagreement here is not cosmetic, it is either two
     /// competing control surfaces or none at all.
-    private var showsCabinet: Bool {
-        TelevisionPresentation.isShowing(
+    private var screenLayout: TelevisionPresentation.Layout {
+        TelevisionPresentation.layout(
             layoutMode: settings.layoutMode,
             showsInLandscape: settings.televisionInLandscape,
-            container: containerSize
+            container: containerSize,
+            fold: foldPosture
         )
     }
 
     private func showControls() {
-        // When the set is on screen it is the control surface, and this floating overlay
-        // would be a second one competing with a better one. The cabinet covers everything
-        // it offered — settings, both directions, mute and power — with play/pause still on
-        // the Apple TV remote's own button.
+        // When the set or its control deck is on screen it is the control surface, and this
+        // floating overlay would be a second one competing with a better one. Both cover
+        // everything it offered — settings, both directions, mute and power — with play/pause
+        // on the deck, and on the Apple TV remote's own button.
         //
-        // Only while the cabinet is actually drawn. Without it this overlay is the only way
-        // to reach anything, so it has to come back the moment the set does not.
-        if showsCabinet { return }
+        // Only while one is actually drawn. Without them this overlay is the only way to
+        // reach anything, so it has to come back the moment they are not.
+        if screenLayout.hasBuiltInControls { return }
         isShowingControls = true
         controlsHideTask?.cancel()
         // Idle timeout, restarted by any remote movement, so the controls stay up while

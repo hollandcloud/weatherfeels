@@ -111,12 +111,23 @@ public struct WeatherStarView: View {
     /// Called when the cabinet's power button is pressed.
     private let onPower: () -> Void
 
+    /// Whether a cabinet, when one is drawn, carries its buttons.
+    ///
+    /// False when the view is one half of a folded screen. The other half is then the set's
+    /// control deck, and buttons here would be a second set of the same controls. The cabinet
+    /// itself still follows the ordinary rule: held like a book, this half is a page taller
+    /// than it is wide, and a 4:3 picture on a tall page is exactly the band-across-the-top
+    /// the cabinet was introduced to avoid.
+    private let showsCabinetControls: Bool
+
     public init(
         isPictureOn: Bool = true,
+        showsCabinetControls: Bool = true,
         onOpenSettings: @escaping () -> Void = {},
         onPower: @escaping () -> Void = {}
     ) {
         self.isPictureOn = isPictureOn
+        self.showsCabinetControls = showsCabinetControls
         self.onOpenSettings = onOpenSettings
         self.onPower = onPower
     }
@@ -135,7 +146,8 @@ public struct WeatherStarView: View {
         ) else { return nil }
         return TelevisionGeometry.resolve(
             container: container,
-            pictureAspect: DesignSpace.standard.aspectRatio
+            pictureAspect: DesignSpace.standard.aspectRatio,
+            showsControls: showsCabinetControls
         )
     }
 
@@ -164,7 +176,8 @@ public struct WeatherStarView: View {
                             // and applies the rule, so there is nothing to route upward.
                             onToggleSound: { settings.musicEnabled.toggle() },
                             onPower: onPower
-                        )
+                        ),
+                        showsControls: showsCabinetControls
                     ) {
                         picture(metrics: metrics, size: set.screenSize)
                             .frame(width: set.screenSize.width, height: set.screenSize.height)
