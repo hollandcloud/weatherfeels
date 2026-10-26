@@ -98,6 +98,25 @@ Natural Earth release. The towns around you are named, nearest first, without co
 `RadarMapTests` checks registration against the world rather than against our own
 arithmetic: inland Orlando must render as land, and the Gulf and Lake Okeechobee as water.
 
+### Ads, from your own companion server
+
+The WeatherStar ran local advertising in its ticker and between segments. weatherfeels can
+too, from your own [companion server](server/README.md) — **all off by default**, and nothing
+is fetched from the server for ads until one of them is switched on in Settings:
+
+- **Ticker messages** — lines typed in the app, plus the server's, taking a turn among the
+  readings (one after every three) rather than crowding them out. A long line runs over several
+  pages at word breaks.
+- **Local ad cards** — full-screen WeatherStar-style spots (business, a line about it, a few
+  selling points, the phone number, an optional image) in one of five period colour themes.
+  The rotation pauses for one every 4, 6, 8 or 12 displays, then carries on where it was. A
+  tap skips it; a weather bulletin ends it.
+
+The companion server address in Settings is the same one the Music server source uses, so one
+server is set once. Its admin page manages the lines and cards; the manifest it serves is read
+leniently, so one malformed card costs that card rather than the reel, and its file paths are
+only followed on the server's own host.
+
 ### Local on the 8s
 
 The Weather Channel cut away to the local forecast at every minute ending in 8. Turned on in

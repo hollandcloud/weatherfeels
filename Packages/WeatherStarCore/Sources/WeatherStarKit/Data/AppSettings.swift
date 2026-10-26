@@ -181,6 +181,12 @@ public final class AppSettings {
         burnInProtection = defaults.bool(forKey: Key.burnInProtection, default: false)
         #endif
         localOnTheEights = defaults.bool(forKey: Key.localOnTheEights, default: false)
+        tickerAdsEnabled = defaults.bool(forKey: Key.tickerAdsEnabled, default: false)
+        tickerAdLines = defaults.stringArray(forKey: Key.tickerAdLines) ?? []
+        adCardsEnabled = defaults.bool(forKey: Key.adCardsEnabled, default: false)
+        clipReelEnabled = defaults.bool(forKey: Key.clipReelEnabled, default: false)
+        let storedInterval = defaults.value(forKey: Key.adBreakEvery) as? Int ?? AdBreaks.defaultInterval
+        adBreakEvery = AdBreaks.intervals.contains(storedInterval) ? storedInterval : AdBreaks.defaultInterval
         bulletinsEnabled = defaults.bool(forKey: Key.bulletinsEnabled, default: true)
         bulletinTone = defaults.bool(forKey: Key.bulletinTone, default: true)
         shownBulletinIDs = defaults.stringArray(forKey: Key.shownBulletins) ?? []
@@ -242,6 +248,40 @@ public final class AppSettings {
     public var burnInProtection: Bool {
         didSet { defaults.set(burnInProtection, forKey: Key.burnInProtection) }
     }
+
+    // MARK: - Ads
+    //
+    // Every one of these is off until the user turns it on. The ads come from the user's own
+    // companion server, and nothing is fetched from it for ads until one of these says so.
+
+    /// Ad lines in the bottom ticker: the ones typed here, and the server's.
+    public var tickerAdsEnabled: Bool {
+        didSet { defaults.set(tickerAdsEnabled, forKey: Key.tickerAdsEnabled) }
+    }
+
+    /// Ticker lines typed in the app itself, which need no server.
+    public var tickerAdLines: [String] {
+        didSet { defaults.set(tickerAdLines, forKey: Key.tickerAdLines) }
+    }
+
+    /// Full-screen local ad cards from the server, in the rotation's ad breaks.
+    public var adCardsEnabled: Bool {
+        didSet { defaults.set(adCardsEnabled, forKey: Key.adCardsEnabled) }
+    }
+
+    /// Video clips from the server, in the rotation's ad breaks.
+    public var clipReelEnabled: Bool {
+        didSet { defaults.set(clipReelEnabled, forKey: Key.clipReelEnabled) }
+    }
+
+    /// An ad break after this many displays; one of `AdBreaks.intervals`.
+    public var adBreakEvery: Int {
+        didSet { defaults.set(adBreakEvery, forKey: Key.adBreakEvery) }
+    }
+
+    /// The companion server: music, and the ads. The same address the music source uses, so
+    /// one server is set once.
+    public var companionServerURL: URL? { remoteMusicURL }
 
     // MARK: - Local on the 8s
 
@@ -434,6 +474,11 @@ private enum Key {
     static let uploadPath = prefix + "uploadPath"
     static let uploadToken = prefix + "uploadToken"
     static let localOnTheEights = prefix + "localOnTheEights"
+    static let tickerAdsEnabled = prefix + "tickerAdsEnabled"
+    static let tickerAdLines = prefix + "tickerAdLines"
+    static let adCardsEnabled = prefix + "adCardsEnabled"
+    static let clipReelEnabled = prefix + "clipReelEnabled"
+    static let adBreakEvery = prefix + "adBreakEvery"
     static let bulletinsEnabled = prefix + "bulletinsEnabled"
     static let bulletinTone = prefix + "bulletinTone"
     static let shownBulletins = prefix + "shownBulletins"

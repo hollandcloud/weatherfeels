@@ -126,11 +126,15 @@ public struct WeatherStarView: View {
     /// Whether the Local on the 8s bumper is up.
     private let showsEightsBumper: Bool
 
+    /// A local ad card in an ad break, with its image if it has one.
+    private let adCard: (card: AdCard, image: CGImage?)?
+
     public init(
         isPictureOn: Bool = true,
         showsCabinetControls: Bool = true,
         bulletin: (bulletin: WeatherBulletin, shownAt: Date)? = nil,
         showsEightsBumper: Bool = false,
+        adCard: (card: AdCard, image: CGImage?)? = nil,
         onOpenSettings: @escaping () -> Void = {},
         onPower: @escaping () -> Void = {}
     ) {
@@ -138,6 +142,7 @@ public struct WeatherStarView: View {
         self.showsCabinetControls = showsCabinetControls
         self.bulletin = bulletin
         self.showsEightsBumper = showsEightsBumper
+        self.adCard = adCard
         self.onOpenSettings = onOpenSettings
         self.onPower = onPower
     }
@@ -307,6 +312,9 @@ public struct WeatherStarView: View {
             // Across the whole canvas, as the displays that expand to the wide canvas are: a
             // warning should fill the screen, not sit in its middle.
             BulletinScreen(bulletin: bulletin.bulletin, shownAt: bulletin.shownAt)
+                .environment(\.starContentWidth, metrics.space.width)
+        } else if let adCard {
+            AdCardScreen(card: adCard.card, image: adCard.image)
                 .environment(\.starContentWidth, metrics.space.width)
         } else if showsEightsBumper {
             EightsBumper(place: settings.savedLocation?.name, time: store.clockText())

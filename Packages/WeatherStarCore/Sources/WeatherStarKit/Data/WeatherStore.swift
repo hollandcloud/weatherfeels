@@ -33,6 +33,10 @@ public final class WeatherStore {
     public private(set) var almanac: AlmanacData?
     public private(set) var hazards: [HazardItem] = []
     public private(set) var tides: TidesData?
+    /// Ad lines worked into the ticker, when the user has asked for them.
+    private var tickerAds: [String] = []
+    /// Which ad lines take the ticker's slots this time round; advanced on each rebuild.
+    private var tickerAdRotation = 0
     /// Warnings waiting to be shown as a bulletin, most severe first.
     public private(set) var pendingBulletins: [WeatherBulletin] = []
     public private(set) var scroll: ScrollContent?
@@ -918,10 +922,22 @@ public final class WeatherStore {
 
     // MARK: - Scroll ticker
 
+    /// Set the ticker's ad lines and rebuild it. Empty to have none.
+    public func setTickerAds(_ lines: [String]) {
+        guard lines != tickerAds else { return }
+        tickerAds = lines
+        if let parameters { buildScroll(parameters) }
+    }
+
     private func buildScroll(_ parameters: WeatherParameters) {
+        tickerAdRotation += 1
         scroll = ScrollContent(
             header: parameters.cityName,
-            lines: Self.scrollLines(from: currentConditions),
+            lines: TickerAds.interleave(
+                readings: Self.scrollLines(from: currentConditions),
+                ads: tickerAds,
+                rotation: tickerAdRotation
+            ),
             hazardHeadline: hazards.first.map { "\($0.event.uppercased()) - \($0.detail)" }
         )
     }
