@@ -77,6 +77,19 @@ asserts a spread of locations land near the middle of their own window — with 
 Maine flagged as a legitimate exception, since the projection only reaches longitude
 −68.68 and the crop has to clamp inside the composite.
 
+### A zoomable radar map beside it
+
+The WeatherStar "Local Radar" is the authentic display. On iPhone, iPad and Mac there is
+also a modern one: the same NEXRAD `n0q` composite over Apple Maps, looping the last hour,
+pannable and zoomable. It asks IEM's WMS for one image per frame of whatever is in view once
+the view settles — twelve requests, three at a time, newest first — rather than map tiles.
+
+Tiles were the first design, on NOAA nowCOAST. Preloading a twelve-frame loop as tiles is
+about 240 requests in a few seconds, and nowCOAST's CloudFront front end answered with
+`403 Request blocked` for every request from the address, capabilities included. A phone
+sharing a carrier's address with other users would lose the map that way. The composite
+covers the lower 48 only, and the map says so elsewhere rather than showing clear skies.
+
 ## Screen care on a television
 
 Two options under **Settings → Display**, both aimed at an Apple TV left running for
@@ -556,6 +569,9 @@ python3 Tools/woff2ttf.py <out_dir> path/to/*.woff
 | **tvOS** | swipe left / right | Play/Pause button | swipe up, then gear |
 | **iOS / iPadOS** | tap for controls | tap for controls | tap for controls |
 | **macOS** | ← / → | Space | ⌘, |
+
+On iPhone, iPad and Mac the zoomable **radar map** opens from the controls, the iPhone Duo's
+control deck, the top of Settings, or ⌘R on the Mac.
 
 ## Attribution and licence
 
