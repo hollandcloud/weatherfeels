@@ -274,7 +274,7 @@ public actor RadarService {
     /// The same eight colours ws4kp maps the NWS's 5 dBZ bands to, now keyed by the value
     /// itself. Below 20 dBZ is clear: those returns are mostly drizzle too light to matter,
     /// ground clutter and birds, and the original hardware never drew them either.
-    static func weatherStarColour(dBZ: Double) -> (UInt8, UInt8, UInt8, UInt8) {
+    public static func weatherStarColour(dBZ: Double) -> (UInt8, UInt8, UInt8, UInt8) {
         switch dBZ {
         case ..<20: (0, 0, 0, 0)
         case ..<25: (49, 210, 22, 255)
