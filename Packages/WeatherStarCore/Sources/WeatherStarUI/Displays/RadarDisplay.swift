@@ -15,9 +15,15 @@ struct RadarDisplay: View {
     let center: SavedLocation?
     let timeZone: TimeZone
 
-    private enum Layout {
-        static let top: CGFloat = 0
+    enum Layout {
         static let height: CGFloat = 367
+        /// The radar window's full width, which is the wide canvas's.
+        ///
+        /// Both layers are always drawn at this width and centred, and the standard canvas
+        /// simply shows less of them. Stretching them to whichever width the canvas has would
+        /// change the scale between canvases — and the frames and the base map would have to be
+        /// stretched in exactly the same way, every time, to stay registered.
+        static let fullWidth: CGFloat = RadarService.imageSize.width
         static let timestampY: CGFloat = 330
     }
 
@@ -28,18 +34,26 @@ struct RadarDisplay: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            if let center {
-                RadarBaseMap(center: center, viewportSize: viewportSize)
+            ZStack {
+                if let center {
+                    RadarBaseMap(center: center)
+                }
+
+                if let frame = currentFrame {
+                    // Nearest-neighbour keeps the radar's blocky bins intact when scaled.
+                    Image(decorative: frame.image, scale: 1)
+                        .interpolation(.none)
+                        .antialiased(false)
+                        .resizable()
+                        .designFrame(width: Layout.fullWidth, height: Layout.height)
+                }
             }
+            // Narrower than its contents on the standard canvas, which centres them: the
+            // location stays in the middle of the window either way.
+            .designFrame(width: contentWidth, height: Layout.height)
+            .clipped()
 
             if let frame = currentFrame {
-                // Nearest-neighbour keeps the radar's blocky bins intact when scaled.
-                Image(decorative: frame.image, scale: 1)
-                    .interpolation(.none)
-                    .antialiased(false)
-                    .resizable()
-                    .designFrame(width: contentWidth, height: Layout.height)
-
                 StarText(
                     Self.timestampText(frame.timestamp, in: timeZone),
                     font: .small,
@@ -56,10 +70,6 @@ struct RadarDisplay: View {
         .clipped()
     }
 
-    private var viewportSize: CGSize {
-        CGSize(width: contentWidth, height: Layout.height)
-    }
-
     private static func timestampText(_ date: Date, in timeZone: TimeZone) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -74,11 +84,7 @@ struct RadarDisplay: View {
 /// Both layers derive their bounds from `RadarService.bounds`, so the map and the
 /// returns stay registered no matter where the user is.
 private struct RadarBaseMap: View {
-    @Environment(\.starMetrics) private var metrics
-    @Environment(\.starContentWidth) private var contentWidth
-
     let center: SavedLocation
-    let viewportSize: CGSize
 
     @State private var cropped: CGImage?
 
@@ -88,12 +94,11 @@ private struct RadarBaseMap: View {
                 Image(decorative: cropped, scale: 1)
                     .interpolation(.medium)
                     .resizable()
-                    .designFrame(width: viewportSize.width, height: viewportSize.height)
             } else {
                 Color(hex: 0x233270)
-                    .designFrame(width: viewportSize.width, height: viewportSize.height)
             }
         }
+        .designFrame(width: RadarDisplay.Layout.fullWidth, height: RadarDisplay.Layout.height)
         .task(id: center.id) {
             cropped = Self.crop(center: center)
         }

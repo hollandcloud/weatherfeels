@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Testing
 @testable import WeatherStarKit
@@ -483,70 +484,167 @@ struct SPCGeometryTests {
     }
 }
 
-/// The radar window must be centred on the viewer's location.
+/// The radar window must be centred on the viewer, at the same scale everywhere.
 ///
-/// Upstream's `RADAR_OFFSET` of `{x: 240, y: 138}` against a 240×163 crop put the
-/// location in the bottom-right *corner*, so "Local Radar" displayed the area to the
-/// north-west. These assert the geographic window actually surrounds the point.
+/// The suite this replaced checked the projection against itself, which is how a window
+/// actually cut from 290 km away passed it for months. The window is now a box of coordinates
+/// that the server draws the radar into, so these check the box — and that the request carries
+/// it — rather than any projection of ours.
 @Suite("Radar framing")
 struct RadarFramingTests {
-    /// `canCentre` is false where the composite runs out before the crop can be centred,
-    /// so the window is legitimately clamped and the location sits off to one side.
-    ///
-    /// The projection spans longitude −129.138 to about −68.68 (`2550 / 42.1768` degrees
-    /// east of the anchor), so eastern Maine is right at the edge — Bangor is at −68.77,
-    /// barely inside. That is inherited from upstream's constants, not a framing fault,
-    /// and no offset can fix it.
-    private static let places: [
-        (name: String, latitude: Double, longitude: Double, canCentre: Bool)
-    ] = [
-        ("Tampa FL", 27.9506, -82.4572, true),
-        ("Orlando FL", 28.5383, -81.3792, true),
-        ("Seattle WA", 47.6062, -122.3321, true),
-        ("Chicago IL", 41.8781, -87.6298, true),
-        ("Denver CO", 39.7392, -104.9903, true),
-        ("Bangor ME", 44.8016, -68.7712, false),
+    private static let places: [(name: String, latitude: Double, longitude: Double)] = [
+        ("Tampa FL", 27.9506, -82.4572),
+        ("Seattle WA", 47.6062, -122.3321),
+        ("Chicago IL", 41.8781, -87.6298),
+        ("Denver CO", 39.7392, -104.9903),
+        ("Bangor ME", 44.8016, -68.7712),
     ]
 
-    @Test("The location falls inside its own radar window")
-    func locationInsideBounds() {
+    /// Great-circle distance, independent of anything in the app.
+    private func kilometres(_ lat1: Double, _ lon1: Double, _ lat2: Double, _ lon2: Double) -> Double {
+        let radians = Double.pi / 180
+        let dLat = (lat2 - lat1) * radians
+        let dLon = (lon2 - lon1) * radians
+        let a = sin(dLat / 2) * sin(dLat / 2)
+            + cos(lat1 * radians) * cos(lat2 * radians) * sin(dLon / 2) * sin(dLon / 2)
+        return 6371 * 2 * atan2(a.squareRoot(), (1 - a).squareRoot())
+    }
+
+    @Test("The location is the centre of its radar window")
+    func locationIsCentred() {
         for place in Self.places {
-            let bounds = RadarService.bounds(
-                latitude: place.latitude, longitude: place.longitude
-            )
-            #expect(
-                bounds.minLatitude < place.latitude && place.latitude < bounds.maxLatitude,
-                "\(place.name): latitude \(place.latitude) outside \(bounds.minLatitude)...\(bounds.maxLatitude)"
-            )
-            #expect(
-                bounds.minLongitude < place.longitude && place.longitude < bounds.maxLongitude,
-                "\(place.name): longitude \(place.longitude) outside \(bounds.minLongitude)...\(bounds.maxLongitude)"
-            )
+            let bounds = RadarService.bounds(latitude: place.latitude, longitude: place.longitude)
+            #expect(abs((bounds.minLatitude + bounds.maxLatitude) / 2 - place.latitude) < 1e-9, "\(place.name)")
+            #expect(abs((bounds.minLongitude + bounds.maxLongitude) / 2 - place.longitude) < 1e-9, "\(place.name)")
         }
     }
 
-    @Test("The location sits near the middle of the window")
-    func locationNearCentre() {
-        for place in Self.places where place.canCentre {
-            let bounds = RadarService.bounds(
-                latitude: place.latitude, longitude: place.longitude
-            )
-            let acrossFraction =
-                (place.longitude - bounds.minLongitude) / (bounds.maxLongitude - bounds.minLongitude)
-            let downFraction =
-                (bounds.maxLatitude - place.latitude) / (bounds.maxLatitude - bounds.minLatitude)
-
-            // Generously wide, but the old behaviour was 1.00 across and 0.85 down, so
-            // this still rejects it decisively.
-            #expect(
-                (0.25...0.75).contains(acrossFraction),
-                "\(place.name): \(Int(acrossFraction * 100))% across the radar window"
-            )
-            #expect(
-                (0.25...0.75).contains(downFraction),
-                "\(place.name): \(Int(downFraction * 100))% down the radar window"
-            )
+    /// A fixed span in degrees would show a wider area of Washington than of Florida. The
+    /// window is widened by latitude so it covers the same ground everywhere — checked here
+    /// with a great-circle distance, not with the formula that produced it.
+    @Test("The window spans the same ground at every latitude")
+    func sameGroundEverywhere() {
+        for place in Self.places {
+            let bounds = RadarService.bounds(latitude: place.latitude, longitude: place.longitude)
+            let across = kilometres(place.latitude, bounds.minLongitude, place.latitude, bounds.maxLongitude)
+            let down = kilometres(bounds.minLatitude, place.longitude, bounds.maxLatitude, place.longitude)
+            #expect(abs(across - RadarService.windowWidthKilometres) < 15, "\(place.name): \(Int(across)) km across")
+            let expectedDown = RadarService.windowWidthKilometres
+                * RadarService.imageSize.height / RadarService.imageSize.width
+            #expect(abs(down - expectedDown) < 10, "\(place.name): \(Int(down)) km down")
         }
+    }
+
+    /// The server georeferences the frame by the box in the request, so the request carrying
+    /// exactly the window's coordinates is what puts the location in the middle of the image.
+    @Test("Each frame is requested for exactly the window")
+    func requestCarriesTheWindow() throws {
+        let bounds = RadarService.bounds(latitude: 27.9506, longitude: -82.4572)
+        let time = Date(timeIntervalSince1970: 1_793_030_100)
+        let url = try #require(RadarService.frameURL(bounds: bounds, time: time))
+        let items = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
+        func value(_ name: String) -> String? { items.first { $0.name == name }?.value }
+
+        #expect(url.host == "mesonet.agron.iastate.edu")
+        #expect(value("SRS") == "EPSG:4326")
+        #expect(value("LAYERS") == "nexrad-n0q-wmst")
+        #expect(value("WIDTH") == "854")
+        #expect(value("HEIGHT") == "367")
+        #expect(value("TIME") == "2026-10-26T15:55:00Z")
+
+        let box = try #require(value("BBOX")).split(separator: ",").compactMap { Double($0) }
+        #expect(box.count == 4)
+        #expect(abs(box[0] - bounds.minLongitude) < 0.001)
+        #expect(abs(box[1] - bounds.minLatitude) < 0.001)
+        #expect(abs(box[2] - bounds.maxLongitude) < 0.001)
+        #expect(abs(box[3] - bounds.maxLatitude) < 0.001)
+    }
+
+    /// The composite is the lower 48 only. Before, a location outside it was clamped to the
+    /// nearest corner and shown somebody else's weather.
+    @Test("Places the composite does not cover get no radar")
+    func outsideCoverageHasNoFrames() async throws {
+        #expect(!RadarService.covers(latitude: 21.3069, longitude: -157.8583))
+        #expect(!RadarService.covers(latitude: 61.2181, longitude: -149.9003))
+        #expect(RadarService.covers(latitude: 44.8016, longitude: -68.7712))
+        let frames = try await RadarService().frames(latitude: 21.3069, longitude: -157.8583)
+        #expect(frames.isEmpty)
+    }
+
+    @Test("Frame times fall on the composite's five-minute marks")
+    func framesOnFiveMinuteMarks() {
+        let date = Date(timeIntervalSince1970: 1_793_030_399)
+        #expect(RadarService.roundedDown(date).timeIntervalSince1970 == 1_793_030_100)
+    }
+}
+
+@Suite("Radar colours")
+struct RadarColourTests {
+    @Test("Every reflectivity has its own colour in IEM's table")
+    func nexradPaletteIsDistinct() {
+        #expect(NEXRADPalette.colours.count == 256)
+        #expect(Set(NEXRADPalette.colours).count == 256)
+        // Index 0 is no data, so it carries no reflectivity.
+        #expect(NEXRADPalette.reflectivity[NEXRADPalette.colours[0]] == nil)
+        #expect(NEXRADPalette.reflectivity[NEXRADPalette.colours[104]] == 20)
+        #expect(NEXRADPalette.reflectivity[NEXRADPalette.colours[255]] == 95.5)
+    }
+
+    @Test("Reflectivity maps onto the WeatherStar bands")
+    func weatherStarBands() {
+        #expect(RadarService.weatherStarColour(dBZ: 19.5).3 == 0)
+        #expect(RadarService.weatherStarColour(dBZ: 20) == (49, 210, 22, 255))
+        #expect(RadarService.weatherStarColour(dBZ: 43) == (196, 179, 70, 255))
+        #expect(RadarService.weatherStarColour(dBZ: 55) == (171, 14, 14, 255))
+        #expect(RadarService.weatherStarColour(dBZ: 70) == (115, 31, 4, 255))
+    }
+
+    /// One pixel of each kind: no data, a 43 dBZ echo, and a colour not in IEM's table.
+    private func image(_ pixels: [(UInt8, UInt8, UInt8, UInt8)]) -> CGImage {
+        var bytes = pixels.flatMap { [$0.0, $0.1, $0.2, $0.3] }
+        return bytes.withUnsafeMutableBytes { buffer in
+            CGContext(
+                data: buffer.baseAddress, width: pixels.count, height: 1,
+                bitsPerComponent: 8, bytesPerRow: pixels.count * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )!.makeImage()!
+        }
+    }
+
+    private func rgba(_ image: CGImage) -> [UInt8] {
+        var bytes = [UInt8](repeating: 0, count: image.width * image.height * 4)
+        bytes.withUnsafeMutableBytes { buffer in
+            CGContext(
+                data: buffer.baseAddress, width: image.width, height: image.height,
+                bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )!.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        }
+        return bytes
+    }
+
+    @Test("Frames are recoloured by reflectivity, and unknown colours are dropped")
+    func recolourByValue() throws {
+        let echo = NEXRADPalette.colours[150]  // 43 dBZ
+        let source = image([
+            (0, 0, 0, 0),
+            (UInt8(echo >> 16), UInt8((echo >> 8) & 0xFF), UInt8(echo & 0xFF), 255),
+            (1, 2, 3, 255),
+        ])
+        let recoloured = try #require(RadarService.recolour(source))
+        let bytes = rgba(recoloured)
+        #expect(bytes[3] == 0)
+        #expect(Array(bytes[4..<8]) == [196, 179, 70, 255])
+        #expect(bytes[11] == 0)
+    }
+
+    /// The server answers a time it has no composite for with a blank image rather than an
+    /// error, so a frame with nothing in it is treated as missing.
+    @Test("A frame with no echoes is treated as missing")
+    func blankFrameIsMissing() {
+        #expect(RadarService.recolour(image([(0, 0, 0, 0), (1, 2, 3, 255)])) == nil)
     }
 }
 
