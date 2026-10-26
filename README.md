@@ -96,6 +96,12 @@ is fetched from the server for ads until one of them is switched on in Settings:
   selling points, the phone number, an optional image) in one of five period colour themes.
   The rotation pauses for one every 4, 6, 8 or 12 displays, then carries on where it was. A
   tap skips it; a weather bulletin ends it.
+- **Clip reel** — short videos from the server, played as a commercial break inside the
+  picture. When cards and clips are both on they take turns. The music steps back while a clip
+  plays and returns after; a clip that cannot be played ends its break at once, and none runs
+  past its manifest `seconds` or a minute. The video is drawn above the CRT tube effect rather
+  than through it (a Metal layer effect cannot render a platform video layer), with the
+  scanlines laid back over it.
 
 The companion server address in Settings is the same one the Music server source uses, so one
 server is set once. Its admin page manages the lines and cards; the manifest it serves is read

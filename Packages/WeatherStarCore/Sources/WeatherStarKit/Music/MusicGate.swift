@@ -13,7 +13,11 @@ public enum MusicGate {
     /// `musicEnabled` is the user's standing preference and is deliberately not touched by
     /// standby: switching the set off must not look like switching music off, or turning it
     /// back on would leave the music silent with the setting still reading "on".
-    public static func shouldPlay(musicEnabled: Bool, isSetOn: Bool) -> Bool {
-        musicEnabled && isSetOn
+    ///
+    /// A clip from the reel has the floor while it plays: its own soundtrack over the music
+    /// would be two things talking at once. Gated here like standby, rather than paused
+    /// directly, so the music comes back on its own rule when the clip ends.
+    public static func shouldPlay(musicEnabled: Bool, isSetOn: Bool, clipPlaying: Bool = false) -> Bool {
+        musicEnabled && isSetOn && !clipPlaying
     }
 }

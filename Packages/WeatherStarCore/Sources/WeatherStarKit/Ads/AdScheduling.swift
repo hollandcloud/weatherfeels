@@ -91,6 +91,25 @@ public enum AdBreaks {
         }
     }
 
+    /// What an ad break shows.
+    public enum Kind: Equatable, Sendable {
+        case card
+        case clip
+    }
+
+    /// The kind for the next break: whatever is available, taking turns when both are.
+    public static func nextKind(cardsAvailable: Bool, clipsAvailable: Bool, last: Kind?) -> Kind? {
+        switch (cardsAvailable, clipsAvailable) {
+        case (true, true): last == .card ? .clip : .card
+        case (true, false): .card
+        case (false, true): .clip
+        case (false, false): nil
+        }
+    }
+
+    /// The longest a clip runs when the manifest does not say: a commercial, not a programme.
+    public static let defaultClipSeconds = 60
+
     /// Whether to take a break now, `displaysSinceBreak` displays after the last one.
     public static func isDue(displaysSinceBreak: Int, every interval: Int, conditions: Conditions) -> Bool {
         interval > 0 && displaysSinceBreak >= interval && conditions.allowsBreak

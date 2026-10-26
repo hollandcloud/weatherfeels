@@ -183,3 +183,23 @@ struct AdsTests {
     }
     #endif
 }
+
+@Suite("Clip reel")
+struct ClipReelTests {
+    @Test("The music steps back while a clip plays, and only then")
+    func musicGate() {
+        #expect(MusicGate.shouldPlay(musicEnabled: true, isSetOn: true, clipPlaying: false))
+        #expect(!MusicGate.shouldPlay(musicEnabled: true, isSetOn: true, clipPlaying: true))
+        #expect(!MusicGate.shouldPlay(musicEnabled: false, isSetOn: true, clipPlaying: false))
+    }
+
+    @Test("Cards and clips take turns when both are on")
+    func breaksTakeTurns() {
+        #expect(AdBreaks.nextKind(cardsAvailable: true, clipsAvailable: true, last: nil) == .card)
+        #expect(AdBreaks.nextKind(cardsAvailable: true, clipsAvailable: true, last: .card) == .clip)
+        #expect(AdBreaks.nextKind(cardsAvailable: true, clipsAvailable: true, last: .clip) == .card)
+        #expect(AdBreaks.nextKind(cardsAvailable: false, clipsAvailable: true, last: .clip) == .clip)
+        #expect(AdBreaks.nextKind(cardsAvailable: true, clipsAvailable: false, last: .card) == .card)
+        #expect(AdBreaks.nextKind(cardsAvailable: false, clipsAvailable: false, last: nil) == nil)
+    }
+}
