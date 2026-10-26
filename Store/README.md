@@ -29,6 +29,9 @@ Store/
     iphone/   2868x1320         6.9", landscape — the picture filling the screen
     ipad/     2064x2752         13", portrait — the picture on the television
     mac/      2880x1800         window at 1440x810 (16:9), padded to a size Apple accepts
+    duo-inner/          2853x2007   iPhone Duo open: book pose (set and control deck) and flat
+    duo-outer/          2034x1398   iPhone Duo closed, sideways (not yet shot; the script makes it)
+    duo-outer-upright/  1398x2034   iPhone Duo closed, upright (not yet shot; the script makes it)
 
 docs/
   privacy.md                    the published privacy policy
@@ -187,6 +190,32 @@ method is worth recording:
   lands exactly on the App Store pixel sizes.
 - Tampa, Florida, chosen for the location: coastal radar has something on it, and the
   city name is short enough not to truncate in the ticker.
+
+### iPhone Duo
+
+`Tools/shoot.sh duo` shoots all three Duo sets in one run, about fifteen minutes. Submitting them
+is what puts the iPhone Duo badge on the product page; App Store Connect shows it once
+there are Duo screenshots. Apple's screenshot specifications list both displays' sizes
+under one iPhone Duo heading; they are in addition to the standard iPhone set, not instead
+of it. From April 2027 they become required for builds on the iOS 27.1 SDK or later.
+
+- The inner set leads with the book pose: folded partway with the crease down the middle,
+  the set stands on the leading page and the control deck fills the trailing one. That is
+  the shot only this device can show, so it goes first. The others are open flat, where the
+  picture fills the nearly-4:3 inner display.
+- The hinge is set by `Tools/hinge_helper.c`, vendored from Artem Novichkov's
+  iPhone-Duo-by-Examples (MIT): `simctl` has no hinge command.
+- Every display stays enabled and `WS4K_HOLD_DISPLAY` holds the rotation on the one being
+  shot, so the deck shows its full set of presets.
+- The closed display comes as two sets because Apple accepts it either way up, and whether
+  one set may mix the two has not been checked. Upload one, or try both in the same slot.
+- For a few seconds after launch iOS draws a black disc over the outer display's camera
+  hole. Each closed shot is checked for it and retaken until it has gone.
+- Only the open set is checked in so far. The closed sets come from the same run; shoot them
+  with nothing else driving the simulator, and look at every image — a capture of the home
+  screen passes the size and alpha checks.
+- The laptop pose is not in the set. It needs the device turned on its side, which only
+  DeviceHub's window can do; shoot it there by hand if you want it.
 
 The images are raw device captures, no frames or captions. That is allowed, and honest.
 If you want captioned marketing frames later, these are the source material.

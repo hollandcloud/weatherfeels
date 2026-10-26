@@ -497,6 +497,20 @@ public struct RootView: View {
             hasRevealedControlsOnce = true
             showControls()
         }
+
+        // For `Tools/shoot.sh`, which needs one display on screen and held there, with the
+        // rest still enabled so the Duo's control deck shows its full set of presets. It
+        // waits for the display's data, since `jump` ignores a display with nothing to show.
+        if let raw = ProcessInfo.processInfo.environment["WS4K_HOLD_DISPLAY"],
+           let display = DisplayIdentifier(rawValue: raw) {
+            var waited = 0
+            while !engine.state(for: display).isReady, waited < 60 {
+                try? await Task.sleep(for: .seconds(1))
+                waited += 1
+            }
+            engine.jump(to: display)
+            engine.isPlaying = false
+        }
     }
 
     /// Resolve which location to show, preferring a fresh device fix when the user
