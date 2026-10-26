@@ -64,6 +64,12 @@ struct CurrentConditionsWidget: Widget {
         .configurationDisplayName("Current Conditions")
         .description("The current conditions where you are, WeatherStar style.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        // The layouts carry their own margins, sized for the Star4000 faces; the system's
+        // would double them, and the large table would lose rows it has room for.
+        .contentMarginsDisabled()
+        // StandBy drops a widget's background by default, which would leave the text on
+        // black. The blue field is the point.
+        .containerBackgroundRemovable(false)
     }
 }
 
