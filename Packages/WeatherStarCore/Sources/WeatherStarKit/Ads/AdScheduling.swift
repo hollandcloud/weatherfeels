@@ -91,21 +91,8 @@ public enum AdBreaks {
         }
     }
 
-    /// What an ad break shows.
-    public enum Kind: Equatable, Sendable {
-        case card
-        case clip
-    }
-
-    /// The kind for the next break: whatever is available, taking turns when both are.
-    public static func nextKind(cardsAvailable: Bool, clipsAvailable: Bool, last: Kind?) -> Kind? {
-        switch (cardsAvailable, clipsAvailable) {
-        case (true, true): last == .card ? .clip : .card
-        case (true, false): .card
-        case (false, true): .clip
-        case (false, false): nil
-        }
-    }
+    /// How many ads one break plays back to back, like a station's commercial break.
+    public static let adsPerBreak = 2...3
 
     /// The longest a clip runs when the manifest does not say: a commercial, not a programme.
     public static let defaultClipSeconds = 60
@@ -113,5 +100,84 @@ public enum AdBreaks {
     /// Whether to take a break now, `displaysSinceBreak` displays after the last one.
     public static func isDue(displaysSinceBreak: Int, every interval: Int, conditions: Conditions) -> Bool {
         interval > 0 && displaysSinceBreak >= interval && conditions.allowsBreak
+    }
+}
+
+/// One ad in a break: a card or a clip from the reel.
+public enum AdSpot: Equatable, Sendable, Identifiable {
+    case card(AdCard)
+    case clip(AdClip)
+
+    /// Unique across both kinds, even if a hand-written manifest reuses an id between them.
+    public var id: String {
+        switch self {
+        case .card(let card): "card:" + card.id
+        case .clip(let clip): "clip:" + clip.id
+        }
+    }
+}
+
+/// Deals ad breaks from every ad on offer, cards and clips together, in random order.
+///
+/// A shuffle bag: every ad plays once before any plays twice, so a long reel is seen through
+/// rather than sampled with repeats. A fresh shuffle never opens with the ad that closed the
+/// last one, and no break shows one ad twice. The bag holds ids rather than positions,
+/// because the manifest is fetched again at every weather refresh: an ad that went away is
+/// dropped, a new one joins the ads still to come, and the round keeps its place.
+public struct AdShuffle: Sendable {
+    /// Ids still to come this round, next first.
+    public private(set) var upcoming: [String] = []
+    /// Ids already played this round.
+    private var played: Set<String> = []
+    /// The ad shown last, so a new round does not open with it.
+    private var last: String?
+
+    public init() {}
+
+    /// The next break's ads, `AdBreaks.adsPerBreak` of them, or all there are if fewer.
+    public mutating func nextBreak(from spots: [AdSpot]) -> [AdSpot] {
+        var generator = SystemRandomNumberGenerator()
+        return nextBreak(from: spots, using: &generator)
+    }
+
+    public mutating func nextBreak(from spots: [AdSpot], using generator: inout some RandomNumberGenerator) -> [AdSpot] {
+        var byID: [String: AdSpot] = [:]
+        var ids: [String] = []
+        for spot in spots where byID[spot.id] == nil {
+            byID[spot.id] = spot
+            ids.append(spot.id)
+        }
+        guard !ids.isEmpty else { return [] }
+
+        // Catch up with the manifest. Placing each new ad at a random point among those to
+        // come is itself a shuffle, which is how the very first round is dealt.
+        upcoming.removeAll { byID[$0] == nil }
+        played.formIntersection(ids)
+        let waiting = Set(upcoming)
+        for id in ids where !played.contains(id) && !waiting.contains(id) {
+            upcoming.insert(id, at: Int.random(in: 0...upcoming.count, using: &generator))
+        }
+
+        let count = min(Int.random(in: AdBreaks.adsPerBreak, using: &generator), ids.count)
+        var chosen: [String] = []
+        while chosen.count < count {
+            if upcoming.isEmpty { startRound(with: ids, after: chosen, using: &generator) }
+            let id = upcoming.removeFirst()
+            played.insert(id)
+            chosen.append(id)
+            last = id
+        }
+        return chosen.compactMap { byID[$0] }
+    }
+
+    /// Shuffle every ad into a new round. What was just shown goes to the back, so nothing
+    /// repeats across the seam or within the break that crosses it.
+    private mutating func startRound(
+        with ids: [String], after chosen: [String], using generator: inout some RandomNumberGenerator
+    ) {
+        let recent = Set(chosen + [last].compactMap(\.self))
+        let deck = ids.shuffled(using: &generator)
+        upcoming = deck.filter { !recent.contains($0) } + deck.filter { recent.contains($0) }
+        played = []
     }
 }

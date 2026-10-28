@@ -67,15 +67,14 @@ public struct RootView: View {
     @State private var adCard: (card: AdCard, image: CGImage?)?
     /// A clip from the reel playing in an ad break.
     @State private var clip: ClipPlayback?
-    /// What the last break showed, so cards and clips take turns.
-    @State private var lastBreakKind: AdBreaks.Kind?
-    /// Which clip the next clip break plays; the reel goes round in order.
-    @State private var nextClipIndex = 0
+    /// Deals each break's ads from the cards and clips together, shuffled.
+    @State private var adShuffle = AdShuffle()
+    /// The ads still to come in the break on screen.
+    @State private var breakQueue: [AdSpot] = []
+    /// Moves a card's break on when its time is up.
     @State private var adBreakEnd: Task<Void, Never>?
     /// Displays shown since the last ad break.
     @State private var displaysSinceBreak = 0
-    /// Which card the next break shows; the cards take turns.
-    @State private var nextCardIndex = 0
     /// Whether the scene is in front, kept as state.
     ///
     /// `scenePhase` is an environment value, and read from a long-running task it is the value
@@ -710,13 +709,9 @@ public struct RootView: View {
 
     /// Take an ad break if one is due, there is something to show, and nothing outranks it.
     private func considerAdBreak() {
-        let cards = settings.adCardsEnabled ? ads.manifest.cards : []
-        let clips = settings.clipReelEnabled ? ads.manifest.clips : []
-        guard adCard == nil, clip == nil,
-              let kind = AdBreaks.nextKind(
-                  cardsAvailable: !cards.isEmpty, clipsAvailable: !clips.isEmpty, last: lastBreakKind
-              )
-        else { return }
+        let spots = (settings.adCardsEnabled ? ads.manifest.cards.map(AdSpot.card) : [])
+            + (settings.clipReelEnabled ? ads.manifest.clips.map(AdSpot.clip) : [])
+        guard adCard == nil, clip == nil, !spots.isEmpty else { return }
         let conditions = AdBreaks.Conditions(
             sceneIsActive: isSceneActive,
             pictureIsOn: isPictureOn,
@@ -730,35 +725,47 @@ public struct RootView: View {
 
         hideControls()
         engine.isSuspended = true
-        lastBreakKind = kind
+        breakQueue = adShuffle.nextBreak(from: spots)
+        playNextAd()
+    }
 
-        switch kind {
-        case .card:
-            let card = cards[nextCardIndex % cards.count]
-            nextCardIndex += 1
+    /// Put the break's next ad up, or go back to the rotation when the break is over.
+    private func playNextAd() {
+        adBreakEnd?.cancel()
+        adBreakEnd = nil
+        guard !breakQueue.isEmpty else {
+            endAdBreak()
+            return
+        }
+        // The music is applied once, after the change, so it does not come up for an instant
+        // between two clips.
+        clip?.stop()
+        clip = nil
+        adCard = nil
+
+        switch breakQueue.removeFirst() {
+        case .card(let card):
             adCard = (card, ads.cardImages[card.id])
-            adBreakEnd?.cancel()
             adBreakEnd = Task {
                 try? await Task.sleep(for: .seconds(card.seconds))
                 guard !Task.isCancelled else { return }
-                endAdBreak()
+                playNextAd()
             }
-        case .clip:
-            let next = clips[nextClipIndex % clips.count]
-            nextClipIndex += 1
+        case .clip(let next):
             // The clip has the floor: the music steps back through its gate, and comes
             // back the same way when the clip is done.
             clip = ClipPlayback(clip: next, volume: Float(settings.musicVolume)) {
-                endAdBreak()
+                playNextAd()
             }
-            applyMusicState()
         }
+        applyMusicState()
     }
 
-    /// Back to the rotation, where it was.
+    /// Back to the rotation, where it was, however much of the break was left.
     private func endAdBreak() {
         adBreakEnd?.cancel()
         adBreakEnd = nil
+        breakQueue = []
         adCard = nil
         if let playing = clip {
             playing.stop()

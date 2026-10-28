@@ -109,14 +109,20 @@ is fetched from the server for ads until one of them is switched on in Settings:
   pages at word breaks.
 - **Local ad cards** — full-screen WeatherStar-style spots (business, a line about it, a few
   selling points, the phone number, an optional image) in one of five period colour themes.
-  The rotation pauses for one every 4, 6, 8 or 12 displays, then carries on where it was. A
-  tap skips it; a weather bulletin ends it.
-- **Clip reel** — short videos from the server, played as a commercial break inside the
-  picture. When cards and clips are both on they take turns. The music steps back while a clip
-  plays and returns after; a clip that cannot be played ends its break at once, and none runs
-  past its manifest `seconds` or a minute. The video is drawn above the CRT tube effect rather
-  than through it (a Metal layer effect cannot render a platform video layer), with the
-  scanlines laid back over it.
+  The rotation pauses for an ad break every 4, 6, 8 or 12 displays, then carries on where it
+  was. A tap ends the break; a weather bulletin ends it too.
+- **Clip reel** — short videos from the server, played inside the picture. The music steps
+  back while a clip plays and returns after; a clip that cannot be played gives way to the next
+  ad at once, and none runs past its manifest `seconds` or a minute. The video is drawn above
+  the CRT tube effect rather than through it (a Metal layer effect cannot render a platform
+  video layer), with the scanlines laid back over it.
+
+Each ad break plays two or three ads back to back, drawn from the cards and the clips
+together. The app does the shuffling, so any server or static host gets it, and the manifest's
+order does not matter. It is a shuffle bag: every ad comes round once before any comes round
+again, a break never shows one ad twice, and a new round never opens with the ad that closed
+the last one. The bag is kept by ad id, so the manifest fetched again at each refresh keeps
+its place in the round.
 
 The companion server address in Settings is the same one the Music server source uses, so one
 server is set once. Its admin page manages the lines and cards; the manifest it serves is read
