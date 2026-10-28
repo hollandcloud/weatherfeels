@@ -5,9 +5,9 @@ import WeatherStarKit
 /// One clip from the reel, playing.
 ///
 /// Calls `onEnd` once — when the clip finishes, when it cannot be played, or when it reaches
-/// its time limit — so the ad break always hands back to the rotation, whatever the file or
-/// the network does. A clip that fails to load ends the break at once rather than leaving a
-/// black picture up for its full slot.
+/// its time limit — so the ad break always moves on, whatever the file or the network does.
+/// A clip that fails to load gives way to the next ad at once rather than leaving a black
+/// picture up for its full slot.
 @MainActor
 final class ClipPlayback {
     let player: AVPlayer
@@ -49,8 +49,11 @@ final class ClipPlayback {
         onEnd()
     }
 
-    /// Stop without telling the owner, for when the owner is the one ending the break.
+    /// Stop without telling the owner, for when the owner is the one ending the break. A
+    /// failure already on its way to `finish` is dropped too, so it cannot move on a break
+    /// that has since moved on itself.
     func stop() {
+        ended = true
         player.pause()
         limit?.cancel()
         statusObservation?.invalidate()

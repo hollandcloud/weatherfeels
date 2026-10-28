@@ -193,13 +193,122 @@ struct ClipReelTests {
         #expect(!MusicGate.shouldPlay(musicEnabled: false, isSetOn: true, clipPlaying: false))
     }
 
-    @Test("Cards and clips take turns when both are on")
-    func breaksTakeTurns() {
-        #expect(AdBreaks.nextKind(cardsAvailable: true, clipsAvailable: true, last: nil) == .card)
-        #expect(AdBreaks.nextKind(cardsAvailable: true, clipsAvailable: true, last: .card) == .clip)
-        #expect(AdBreaks.nextKind(cardsAvailable: true, clipsAvailable: true, last: .clip) == .card)
-        #expect(AdBreaks.nextKind(cardsAvailable: false, clipsAvailable: true, last: .clip) == .clip)
-        #expect(AdBreaks.nextKind(cardsAvailable: true, clipsAvailable: false, last: .card) == .card)
-        #expect(AdBreaks.nextKind(cardsAvailable: false, clipsAvailable: false, last: nil) == nil)
+}
+
+@Suite("Ad breaks")
+struct AdShuffleTests {
+    /// SplitMix64: the same seed gives the same shuffle, so a failure can be replayed.
+    struct SeededGenerator: RandomNumberGenerator {
+        var state: UInt64
+        mutating func next() -> UInt64 {
+            state &+= 0x9E37_79B9_7F4A_7C15
+            var z = state
+            z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+            z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+            return z ^ (z >> 31)
+        }
+    }
+
+    private func clips(_ count: Int, from first: Int = 0) -> [AdSpot] {
+        (first..<first + count).map { index in
+            .clip(AdClip(id: "v-\(index)", title: nil, file: URL(string: "http://nas.local/ads/clips/v-\(index).mp4")!))
+        }
+    }
+
+    private func cards(_ count: Int) -> [AdSpot] {
+        (0..<count).map { .card(AdCard(id: "c-\($0)", business: "Business \($0)")) }
+    }
+
+    /// Every ad dealt over `breaks` breaks, in order, and the size of each break.
+    private func deal(
+        _ spots: [AdSpot], breaks: Int, seed: UInt64, into shuffle: inout AdShuffle
+    ) -> (stream: [String], sizes: [Int]) {
+        var generator = SeededGenerator(state: seed)
+        var stream: [String] = []
+        var sizes: [Int] = []
+        for _ in 0..<breaks {
+            let dealt = shuffle.nextBreak(from: spots, using: &generator)
+            stream += dealt.map(\.id)
+            sizes.append(dealt.count)
+        }
+        return (stream, sizes)
+    }
+
+    @Test("A break is two or three ads, and never shows one twice")
+    func breakSize() {
+        var shuffle = AdShuffle()
+        var generator = SeededGenerator(state: 1)
+        var sizes: Set<Int> = []
+        for _ in 0..<300 {
+            let dealt = shuffle.nextBreak(from: clips(12) + cards(3), using: &generator)
+            sizes.insert(dealt.count)
+            #expect(Set(dealt.map(\.id)).count == dealt.count)
+        }
+        #expect(sizes == [2, 3])
+    }
+
+    @Test("Every ad plays once before any plays twice, and none twice in a row")
+    func shuffleBag() {
+        var shuffle = AdShuffle()
+        let spots = clips(10) + cards(3)
+        let (stream, _) = deal(spots, breaks: 200, seed: 7, into: &shuffle)
+        // A round ends exactly when the bag runs out, so rounds line up with the stream.
+        for start in stride(from: 0, to: stream.count - spots.count, by: spots.count) {
+            #expect(Set(stream[start..<start + spots.count]) == Set(spots.map(\.id)))
+        }
+        for (one, next) in zip(stream, stream.dropFirst()) {
+            #expect(one != next)
+        }
+    }
+
+    @Test("The order is random: not the manifest's, and not the same every launch")
+    func randomOrder() {
+        let spots = clips(30)
+        var first = AdShuffle()
+        var second = AdShuffle()
+        let one = deal(spots, breaks: 15, seed: 11, into: &first).stream.prefix(30)
+        let other = deal(spots, breaks: 15, seed: 12, into: &second).stream.prefix(30)
+        #expect(Array(one) != spots.map(\.id))
+        #expect(one != other)
+    }
+
+    @Test("Cards and clips are dealt from one bag")
+    func cardsAndClipsTogether() {
+        var shuffle = AdShuffle()
+        let (stream, _) = deal(clips(5) + cards(5), breaks: 4, seed: 3, into: &shuffle)
+        let round = stream.prefix(10)
+        #expect(round.filter { $0.hasPrefix("card:") }.count == 5)
+        #expect(round.filter { $0.hasPrefix("clip:") }.count == 5)
+    }
+
+    @Test("With fewer ads than a break holds, the break plays what there is")
+    func fewAds() {
+        var shuffle = AdShuffle()
+        var generator = SeededGenerator(state: 5)
+        #expect(shuffle.nextBreak(from: [], using: &generator).isEmpty)
+        #expect(shuffle.nextBreak(from: clips(1), using: &generator).map(\.id) == ["clip:v-0"])
+        for _ in 0..<20 {
+            #expect(Set(shuffle.nextBreak(from: clips(2), using: &generator).map(\.id)) == ["clip:v-0", "clip:v-1"])
+        }
+    }
+
+    @Test("A refreshed manifest keeps the round's place")
+    func manifestRefresh() {
+        var shuffle = AdShuffle()
+        var generator = SeededGenerator(state: 9)
+        let before = clips(10)
+        let played = shuffle.nextBreak(from: before, using: &generator).map(\.id)
+
+        // Two ads still to come go away and one new one arrives.
+        let gone = Array(shuffle.upcoming.prefix(2))
+        let after = before.filter { !gone.contains($0.id) } + clips(1, from: 10)
+        var rest: [String] = []
+        while rest.count < after.count - played.count {
+            rest += shuffle.nextBreak(from: after, using: &generator).map(\.id)
+        }
+        let round = rest.prefix(after.count - played.count)
+        #expect(Set(round) == Set(after.map(\.id)).subtracting(played))
+        #expect(round.contains("clip:v-10"))
+        #expect(rest.allSatisfy { !gone.contains($0) })
     }
 }

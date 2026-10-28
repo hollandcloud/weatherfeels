@@ -359,8 +359,9 @@ public struct SettingsView: View {
             Text(
                 """
                 Off unless you turn them on. Ticker messages can be typed here; cards and clips \
-                come from your companion server, and take turns when both are on. Nothing is \
-                fetched from the server for ads until one of these is on.
+                come from your companion server. Each break plays two or three of them, \
+                shuffled, and every one comes round before any repeats. Nothing is fetched \
+                from the server for ads until one of these is on.
                 """
             )
         }
