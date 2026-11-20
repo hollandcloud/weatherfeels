@@ -139,12 +139,16 @@ export const createCompanionServer = (config, { logger = console } = {}) => {
 		} catch {
 			return [];
 		}
+		// Symlinks count when they point at a file: the home server's clip reel is a folder of
+		// links into the Plex "Ads" library (lan-hlnd-net HLND-43). stat() follows the link, so
+		// a dangling link or a link to a folder is dropped below.
 		const files = await Promise.all(entries
-			.filter((entry) => entry.isFile() && !entry.name.startsWith('.'))
+			.filter((entry) => (entry.isFile() || entry.isSymbolicLink()) && !entry.name.startsWith('.'))
 			.filter((entry) => Object.hasOwn(KINDS[kind].types, path.extname(entry.name).toLowerCase()))
 			.map(async (entry) => {
 				try {
 					const info = await stat(path.join(dir, entry.name));
+					if (!info.isFile()) return null;
 					return { name: entry.name, path: url + entry.name, size: info.size, modified: info.mtime.toISOString() };
 				} catch {
 					return null;

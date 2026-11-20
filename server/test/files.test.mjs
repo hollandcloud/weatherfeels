@@ -2,7 +2,7 @@
 // the body size limit.
 
 import assert from 'node:assert/strict';
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { after, before, describe, test } from 'node:test';
 
@@ -353,5 +353,31 @@ describe('body size limit', () => {
 
 	test('the server keeps serving after refusing', async () => {
 		assert.equal((await server.request({ path: '/health' })).status, 200);
+	});
+});
+
+describe('symlinked clips', () => {
+	let server;
+	before(async () => { server = await startServer({ WS4K_TOKEN: TOKEN }); });
+	after(() => server.close());
+
+	test('a link to a file is listed and served; dangling links and links to folders are not', async () => {
+		const library = path.join(server.adsDir, '..', 'library');
+		await mkdir(path.join(library, 'a-folder'), { recursive: true });
+		await writeFile(path.join(library, 'real.mp4'), bytes(64));
+		const clips = path.join(server.adsDir, 'clips');
+		await mkdir(clips, { recursive: true });
+		await symlink(path.join('..', '..', 'library', 'real.mp4'), path.join(clips, 'linked.mp4'));
+		await symlink(path.join('..', '..', 'library', 'gone.mp4'), path.join(clips, 'dangling.mp4'));
+		await symlink(path.join('..', '..', 'library', 'a-folder'), path.join(clips, 'folder.mp4'));
+
+		const list = await server.request({ path: '/api/ads/files', token: TOKEN });
+		assert.equal(list.status, 200);
+		assert.deepEqual(list.json.clips.map((c) => c.name), ['linked.mp4']);
+		assert.equal(list.json.clips[0].size, 64);
+
+		const get = await server.request({ path: '/ads/clips/linked.mp4' });
+		assert.equal(get.status, 200);
+		assert.equal(get.body.length, 64);
 	});
 });
